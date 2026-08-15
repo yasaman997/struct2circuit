@@ -8,9 +8,9 @@ Stage 1 contains three sequential checkpoints. Complete and verify each checkpoi
 
 ## Status
 
-- [ ] Stage 1A: random connected equal-edge mixer baseline
-- [ ] Stage 1B: additional structured and null problem generators
-- [ ] Stage 1C: deterministic split/manifest tooling and pre-freeze report
+- [x] Stage 1A: random connected equal-edge mixer baseline
+- [x] Stage 1B: additional structured and null problem generators
+- [x] Stage 1C: deterministic split/manifest tooling and pre-freeze report
 - [ ] Scientific approval to freeze Benchmark v1
 
 ## Before editing
@@ -207,4 +207,3 @@ At each checkpoint and at the end of Stage 1C, report:
 6. Confirmation that blind-test performance was not inspected.
 7. Current checklist status.
 8. The precise decision required before further work.
-
