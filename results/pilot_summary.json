@@ -1,0 +1,51 @@
+{
+  "by_mixer": {
+    "complete": {
+      "mean_normalized_gap": 0.08981885087048386,
+      "mean_probability_optimum": 0.038006876208784846,
+      "median_normalized_gap": 0.094424316048766,
+      "median_probability_optimum": 0.032764815857278,
+      "mixer_edges": 28
+    },
+    "ring": {
+      "mean_normalized_gap": 0.11118731278886083,
+      "mean_probability_optimum": 0.015325135113591723,
+      "median_normalized_gap": 0.11255843827834237,
+      "median_probability_optimum": 0.010918118007286393,
+      "mixer_edges": 8
+    },
+    "structure": {
+      "mean_normalized_gap": 0.10034996499571021,
+      "mean_probability_optimum": 0.026552236588719802,
+      "median_normalized_gap": 0.10171478068102893,
+      "median_probability_optimum": 0.02168938963059358,
+      "mixer_edges": 8
+    }
+  },
+  "central_claim": "A structure-conditioned, feasibility-preserving mixer improves the solution-quality/resource Pareto frontier over fixed mixers for cardinality-constrained QUBOs.",
+  "configuration": {
+    "equal_budget_mixer_edges": 8,
+    "generator": "block_correlated_qubo",
+    "grid_size": 17,
+    "instances": 24,
+    "k": 3,
+    "n": 8,
+    "p": 1,
+    "seed": 20260814
+  },
+  "interpretation_rule": "Advance to the preregistered confirmatory study only if the paired median gap reduction is positive and its exploratory bootstrap interval does not contain zero. This pilot must not be reported as confirmatory evidence.",
+  "paired_structure_vs_ring": {
+    "losses": 7,
+    "mean_gap_reduction": 0.010837347793150631,
+    "median_gap_reduction": 0.014678065096104885,
+    "median_gap_reduction_bootstrap_95_ci": [
+      0.0014599464315068894,
+      0.016576139502476245
+    ],
+    "median_probability_optimum_increase": 0.0059852486144562666,
+    "one_sided_wilcoxon_p": 0.0017521381378173828,
+    "ties": 0,
+    "wins": 17
+  },
+  "status": "exploratory_pilot_not_confirmatory"
+}
