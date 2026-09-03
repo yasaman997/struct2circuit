@@ -31,6 +31,21 @@ This clears the project's exploratory advancement rule, so a locked, multi-famil
 
 This is a **pilot and research scaffold**, not evidence of quantum advantage. A positive pilot result only justifies advancing to deeper circuits, broader instance families, stronger classical/quantum baselines, noise models, blind splits, and hardware-aware resource accounting. The preregistered claim ladder is defined in `paper/research_protocol.md`.
 
+Stage 1 benchmark foundations are implemented. The candidate benchmark remains
+`DRAFT_UNFROZEN` pending scientific approval; blind records are excluded by
+default and no blind performance has been run. See
+`paper/stage_1_prefreeze_report.md` for the proposed counts and decision gate.
+
+Generate or inspect the provisional manifest without exposing blind records:
+
+```bash
+python3 tools/benchmark_manifest.py generate \
+  --config configs/benchmark_v1_draft.json \
+  --output manifests/benchmark_v1_draft.json
+python3 tools/benchmark_manifest.py inspect \
+  --manifest manifests/benchmark_v1_draft.json
+```
+
 ## Quick start
 
 ```bash

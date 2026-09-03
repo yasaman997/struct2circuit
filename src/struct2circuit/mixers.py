@@ -60,6 +60,46 @@ def complete_mixer(n: int) -> MixerSpec:
     return MixerSpec("complete", n, tuple(combinations(range(n), 2)), "all-to-all reference")
 
 
+def random_connected_mixer(
+    n: int,
+    edge_budget: int,
+    seed: int,
+    *,
+    max_attempts: int = 10_000,
+) -> MixerSpec:
+    """Uniformly sample a fixed-size edge set, conditional on connectivity.
+
+    Rejection sampling is simple and unbiased for pilot-scale graphs, but can
+    become inefficient when connectivity is rare at larger sizes.
+    """
+    if not isinstance(n, int) or isinstance(n, bool) or n < 2:
+        raise ValueError("n must be an integer of at least 2")
+    if not isinstance(edge_budget, int) or isinstance(edge_budget, bool):
+        raise ValueError("edge_budget must be an integer")
+    maximum = n * (n - 1) // 2
+    if not n - 1 <= edge_budget <= maximum:
+        raise ValueError(f"edge_budget must lie in [{n - 1}, {maximum}]")
+    if not isinstance(max_attempts, int) or isinstance(max_attempts, bool) or max_attempts < 1:
+        raise ValueError("max_attempts must be a positive integer")
+
+    possible_edges = tuple(combinations(range(n), 2))
+    rng = np.random.default_rng(seed)
+    for _ in range(max_attempts):
+        indices = rng.choice(len(possible_edges), size=edge_budget, replace=False)
+        edges = tuple(sorted(possible_edges[int(index)] for index in indices))
+        if graph_connected(n, edges):
+            return MixerSpec(
+                "random_connected",
+                n,
+                edges,
+                f"uniform fixed-edge rejection sampling; seed={seed}; max_attempts={max_attempts}",
+            )
+    raise RuntimeError(
+        f"could not sample a connected mixer in {max_attempts} attempts "
+        f"(n={n}, edge_budget={edge_budget}, seed={seed})"
+    )
+
+
 class _UnionFind:
     def __init__(self, n: int) -> None:
         self.parent = list(range(n))
@@ -144,4 +184,3 @@ def xy_mixer_hamiltonian(basis: IntArray, mixer: MixerSpec) -> FloatArray:
     if not np.allclose(h, h.T, atol=1e-12):
         raise RuntimeError("constructed XY mixer is not Hermitian")
     return h
-
