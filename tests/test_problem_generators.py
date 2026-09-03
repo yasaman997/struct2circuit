@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from struct2circuit.problems import (  # noqa: E402
+    block_correlated_qubo,
     weak_structure_null_qubo,
     weighted_densest_k_subgraph_qubo,
     weighted_max_k_vertex_cover_qubo,
@@ -57,6 +58,13 @@ class ProblemGeneratorTests(unittest.TestCase):
         self.assertEqual(problem.metadata["generator_version"], "weak_structure_null_v1")
         self.assertAlmostEqual(problem.metadata["normalization"], np.sqrt(3.5))
         self.assertTrue(np.array_equal(np.diag(problem.Q), np.zeros(8)))
+        self.assertEqual(problem.metadata["coefficient_distribution"], "zero_mean_gaussian")
+        self.assertEqual(problem.metadata["scale_normalization"], "sqrt(max(1,density*(n-1)))")
+
+    def test_block_metadata_records_complete_generator_definition(self) -> None:
+        problem = block_correlated_qubo(7, 3, 9, linear_scale=0.61)
+        self.assertEqual(problem.metadata["generator_version"], "block_correlated_v1")
+        self.assertEqual(problem.metadata["linear_scale"], 0.61)
 
     def test_parameter_validation(self) -> None:
         generators = (

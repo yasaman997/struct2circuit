@@ -20,6 +20,7 @@ from struct2circuit.benchmark import (  # noqa: E402
     record_to_qubo,
     require_new_version_for_frozen_change,
     validate_config,
+    validate_record,
     write_manifest,
 )
 from struct2circuit import benchmark as benchmark_module  # noqa: E402
@@ -132,19 +133,84 @@ class BenchmarkManifestTests(unittest.TestCase):
             with self.subTest(family=family):
                 problem = record_to_qubo(record)
                 self.assertEqual((problem.n, problem.k), (record["n"], record["k"]))
+                self.assertEqual(problem.metadata["seed"], record["generator_seed"])
+                self.assertEqual(problem.metadata["generator_version"], record["generator_version"])
+                audit_only = {"regime", "coefficient_distribution", "scale_normalization"}
+                for key, value in record["generator_parameters"].items():
+                    if key not in audit_only:
+                        self.assertEqual(problem.metadata[key], value)
+                if family == "weak_structure_null":
+                    self.assertEqual(
+                        problem.metadata["coefficient_distribution"],
+                        record["generator_parameters"]["coefficient_distribution"],
+                    )
+                    self.assertEqual(
+                        problem.metadata["scale_normalization"],
+                        record["generator_parameters"]["scale_normalization"],
+                    )
 
     def test_blind_reconstruction_is_guarded_without_instantiation(self) -> None:
         blind_record = next(
             record for record in build_manifest(self.config)["records"] if record["split"] == "blind_test"
         )
-        with self.assertRaisesRegex(PermissionError, "allow_blind"):
-            record_to_qubo(blind_record)
+        blind_record["family"] = "tampered"
+        with patch("struct2circuit.benchmark.block_correlated_qubo") as generator:
+            with self.assertRaisesRegex(PermissionError, "allow_blind"):
+                record_to_qubo(blind_record)
+            generator.assert_not_called()
 
     def test_schema_validation(self) -> None:
         invalid = copy.deepcopy(self.config)
         invalid["splits"]["train"][0]["k"] = invalid["splits"]["train"][0]["n"]
         with self.assertRaisesRegex(ValueError, "0 < k < n"):
             validate_config(invalid)
+
+    def test_family_parameter_schema_rejects_missing_unexpected_and_inappropriate(self) -> None:
+        invalid_configs = []
+        missing = copy.deepcopy(self.config)
+        del missing["splits"]["train"][0]["parameters"]["linear_scale"]
+        invalid_configs.append((missing, "missing parameters"))
+        unexpected = copy.deepcopy(self.config)
+        unexpected["splits"]["train"][0]["parameters"]["extra"] = 1
+        invalid_configs.append((unexpected, "unexpected parameters"))
+        inappropriate = copy.deepcopy(self.config)
+        inappropriate["splits"]["train"][0]["parameters"]["density"] = 0.5
+        invalid_configs.append((inappropriate, "unexpected parameters"))
+        invalid_value = copy.deepcopy(self.config)
+        invalid_value["splits"]["train"][2]["parameters"]["density"] = 1.5
+        invalid_configs.append((invalid_value, "density"))
+        for invalid, message in invalid_configs:
+            with self.subTest(message=message), self.assertRaisesRegex(ValueError, message):
+                validate_config(invalid)
+
+    def test_record_schema_and_generator_version_are_validated(self) -> None:
+        record = copy.deepcopy(build_manifest(self.config)["records"][0])
+        del record["random_baseline_seed_namespace"]
+        with self.assertRaisesRegex(ValueError, "missing manifest record fields"):
+            validate_record(record)
+        record = copy.deepcopy(build_manifest(self.config)["records"][0])
+        record["generator_version"] = "unknown_v9"
+        with self.assertRaisesRegex(ValueError, "generator version"):
+            record_to_qubo(record)
+
+    def test_self_consistent_checksums_cannot_hide_stale_instance_id(self) -> None:
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "manifest.json"
+            write_manifest(self.config, path)
+            changed = json.loads(path.read_text())
+            record = changed["records"][0]
+            record["generator_parameters"]["block_strength"] = 0.66
+            record_payload = {key: value for key, value in record.items() if key != "record_checksum"}
+            record["record_checksum"] = hashlib.sha256(
+                canonical_json(record_payload).encode("utf-8")
+            ).hexdigest()
+            changed.pop("manifest_checksum")
+            changed["manifest_checksum"] = hashlib.sha256(
+                canonical_json(changed).encode("utf-8")
+            ).hexdigest()
+            path.write_text(canonical_json(changed) + "\n")
+            with self.assertRaisesRegex(ValueError, "instance_id"):
+                load_manifest(path)
 
     def test_frozen_change_requires_new_version(self) -> None:
         old = copy.deepcopy(self.config)

@@ -140,10 +140,12 @@ def block_correlated_qubo(
         k=k,
         name=f"block_corr_n{n}_k{k}_seed{seed}",
         metadata={
+            "generator_version": "block_correlated_v1",
             "seed": int(seed),
             "n_blocks": int(n_blocks),
             "block_strength": float(block_strength),
             "cross_strength": float(cross_strength),
+            "linear_scale": float(linear_scale),
             "labels": labels.tolist(),
         },
     )
@@ -275,7 +277,8 @@ def weak_structure_null_qubo(
         "density": float(density),
         "coefficient_scale": float(coefficient_scale),
         "normalization": normalization,
-        "distribution": "independent zero-mean Gaussian coefficients with Bernoulli edge mask",
+        "coefficient_distribution": "zero_mean_gaussian",
+        "scale_normalization": "sqrt(max(1,density*(n-1)))",
         **_permutation_metadata(permutation),
     }
     return CardinalityQUBO(q, c, k, f"weak_null_n{n}_k{k}_seed{seed}", metadata)
