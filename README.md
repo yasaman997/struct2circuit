@@ -36,6 +36,18 @@ Stage 1 benchmark foundations are implemented. The candidate benchmark remains
 default and no blind performance has been run. See
 `paper/stage_1_prefreeze_report.md` for the proposed counts and decision gate.
 
+Checkpoint 1 of the subsequent pre-freeze design process provides synthetic-only
+statistical sensitivity tooling. It does not generate QUBOs or select benchmark
+counts:
+
+```bash
+python3 tools/prefreeze_sensitivity.py \
+  --output results/prefreeze_sensitivity.json --seed 20260903
+```
+
+See `tasks/PREFREEZE_DESIGN.md` and `paper/prefreeze_sensitivity_report.md` before
+interpreting the machine-readable output.
+
 Generate or inspect the provisional manifest without exposing blind records:
 
 ```bash
