@@ -57,16 +57,20 @@ The structure mixer beat the ring on 17 of 24 instances and improved the median 
 | Stage | Question answered | Implementation | Evidence needed | Status |
 | --- | --- | --- | --- | --- |
 | 0. Exploratory pilot | Is the idea executable and potentially nontrivial? | Existing simulator, ring/structure/complete mixers, 24-instance pilot | Feasibility, determinism, preliminary effect | Complete |
-| 1A. Random baseline | Does structure beat an instance-independent mixer with the same edge count? | Random connected mixer ensemble | Connectivity, exact edge count, determinism, independence from `Q` | **Next** |
-| 1B. Problem families | Does the idea extend beyond the portfolio-like generator? | Densest-`k`-subgraph, maximum-`k`-vertex-cover, and null generators | Exhaustive objective-equivalence tests | Not started |
-| 1C. Frozen benchmark | Can we prevent tuning on the final test cases? | Train, validation, blind-test, and transfer seed manifest | Disjoint seeds, stable checksum, blind-test guard | Not started |
-| 2. Non-AI heuristic study | Does the transparent `|Q[i,j]|` rule survive stronger controls? | Run matched experiments on train/validation only | Paired effects, failure regimes, null results | Not started |
+| 1A. Random baseline | Does structure beat an instance-independent mixer with the same edge count? | Random connected mixer ensemble | Connectivity, exact edge count, determinism, independence from `Q` | Implemented and verified |
+| 1B. Problem families | Does the idea extend beyond the portfolio-like generator? | Densest-`k`-subgraph, maximum-`k`-vertex-cover, and null generators | Exhaustive objective-equivalence tests | Implemented and verified |
+| 1C. Provisional benchmark | Can we prevent tuning on the final test cases? | Train, validation, blind-test, and transfer seed manifest | Disjoint seeds, stable checksum, blind-test guard | Implemented and verified; not frozen |
+| 2. Non-AI heuristic study | Does the transparent `|Q[i,j]|` rule survive stronger controls? | Run matched experiments on train/validation only | Paired effects, failure regimes, null results | Not started; awaiting freeze approval |
 | 3. AI mixer policy | Can learning improve on the transparent heuristic? | Graph/edge-scoring policy with verifier | Validation gain over heuristic and random search | Not started |
 | 4. Transfer and resources | Does the result survive new sizes and realistic circuit costs? | Depth 1–3, noise, hardware graphs, transpilation | Quality-versus-depth Pareto frontier | Not started |
 | 5. Locked blind test | Does the final method generalize without further tuning? | Run the frozen pipeline once | Corrected confidence intervals and all failed runs | Not started |
 | 6. Paper | Which claims are actually supported? | Figures, tables, methods, limitations, open code | Reproducible manuscript with no overclaiming | Not started |
 
 Do not begin the AI policy at Stage 3 until Stages 1A–2 show that instance structure contains a reproducible signal. Otherwise, AI would add complexity without answering the scientific question.
+
+**Current decision gate:** scientific approval is required before Benchmark v1
+can be frozen. Stage 2, performance comparisons, AI training, and blind
+evaluation remain unstarted.
 
 ## 6. The first coding milestone: Stage 1A
 

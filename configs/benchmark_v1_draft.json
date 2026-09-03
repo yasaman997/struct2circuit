@@ -1,0 +1,490 @@
+{
+  "benchmark_version": "benchmark_v1_candidate",
+  "exact_solver_limit_n": 12,
+  "master_seed": 20260815,
+  "normalization": "per-instance feasible-range normalized optimality gap",
+  "random_baseline_replicates": 8,
+  "splits": {
+    "blind_test": [
+      {
+        "count": 16,
+        "family": "block_correlated",
+        "k": 3,
+        "n": 8,
+        "parameters": {
+          "block_strength": 0.65,
+          "cross_strength": 0.18,
+          "linear_scale": 0.55,
+          "n_blocks": 2,
+          "regime": "moderate"
+        }
+      },
+      {
+        "count": 16,
+        "family": "block_correlated",
+        "k": 4,
+        "n": 10,
+        "parameters": {
+          "block_strength": 0.82,
+          "cross_strength": 0.12,
+          "linear_scale": 0.55,
+          "n_blocks": 3,
+          "regime": "strong"
+        }
+      },
+      {
+        "count": 16,
+        "family": "densest_k_subgraph",
+        "k": 3,
+        "n": 8,
+        "parameters": {
+          "density": 0.45,
+          "planted_community_strength": 1.35,
+          "regime": "moderate",
+          "weight_distribution": "uniform",
+          "weight_range": [
+            0.5,
+            1.5
+          ]
+        }
+      },
+      {
+        "count": 16,
+        "family": "densest_k_subgraph",
+        "k": 4,
+        "n": 10,
+        "parameters": {
+          "density": 0.6,
+          "planted_community_strength": 1.8,
+          "regime": "strong",
+          "weight_distribution": "uniform",
+          "weight_range": [
+            0.5,
+            1.5
+          ]
+        }
+      },
+      {
+        "count": 16,
+        "family": "max_k_vertex_cover",
+        "k": 3,
+        "n": 8,
+        "parameters": {
+          "community_strength": 1.5,
+          "density": 0.4,
+          "hub_strength": 1.0,
+          "regime": "community",
+          "weight_distribution": "uniform",
+          "weight_range": [
+            0.5,
+            1.5
+          ]
+        }
+      },
+      {
+        "count": 16,
+        "family": "max_k_vertex_cover",
+        "k": 4,
+        "n": 10,
+        "parameters": {
+          "community_strength": 1.0,
+          "density": 0.55,
+          "hub_strength": 1.7,
+          "regime": "hub",
+          "weight_distribution": "uniform",
+          "weight_range": [
+            0.5,
+            1.5
+          ]
+        }
+      },
+      {
+        "count": 16,
+        "family": "weak_structure_null",
+        "k": 3,
+        "n": 8,
+        "parameters": {
+          "coefficient_distribution": "zero_mean_gaussian",
+          "coefficient_scale": 1.0,
+          "density": 0.35,
+          "regime": "sparse",
+          "scale_normalization": "sqrt(max(1,density*(n-1)))"
+        }
+      },
+      {
+        "count": 16,
+        "family": "weak_structure_null",
+        "k": 4,
+        "n": 10,
+        "parameters": {
+          "coefficient_distribution": "zero_mean_gaussian",
+          "coefficient_scale": 1.0,
+          "density": 0.7,
+          "regime": "dense",
+          "scale_normalization": "sqrt(max(1,density*(n-1)))"
+        }
+      }
+    ],
+    "train": [
+      {
+        "count": 16,
+        "family": "block_correlated",
+        "k": 3,
+        "n": 8,
+        "parameters": {
+          "block_strength": 0.65,
+          "cross_strength": 0.18,
+          "linear_scale": 0.55,
+          "n_blocks": 2,
+          "regime": "moderate"
+        }
+      },
+      {
+        "count": 16,
+        "family": "block_correlated",
+        "k": 4,
+        "n": 10,
+        "parameters": {
+          "block_strength": 0.82,
+          "cross_strength": 0.12,
+          "linear_scale": 0.55,
+          "n_blocks": 3,
+          "regime": "strong"
+        }
+      },
+      {
+        "count": 16,
+        "family": "densest_k_subgraph",
+        "k": 3,
+        "n": 8,
+        "parameters": {
+          "density": 0.45,
+          "planted_community_strength": 1.35,
+          "regime": "moderate",
+          "weight_distribution": "uniform",
+          "weight_range": [
+            0.5,
+            1.5
+          ]
+        }
+      },
+      {
+        "count": 16,
+        "family": "densest_k_subgraph",
+        "k": 4,
+        "n": 10,
+        "parameters": {
+          "density": 0.6,
+          "planted_community_strength": 1.8,
+          "regime": "strong",
+          "weight_distribution": "uniform",
+          "weight_range": [
+            0.5,
+            1.5
+          ]
+        }
+      },
+      {
+        "count": 16,
+        "family": "max_k_vertex_cover",
+        "k": 3,
+        "n": 8,
+        "parameters": {
+          "community_strength": 1.5,
+          "density": 0.4,
+          "hub_strength": 1.0,
+          "regime": "community",
+          "weight_distribution": "uniform",
+          "weight_range": [
+            0.5,
+            1.5
+          ]
+        }
+      },
+      {
+        "count": 16,
+        "family": "max_k_vertex_cover",
+        "k": 4,
+        "n": 10,
+        "parameters": {
+          "community_strength": 1.0,
+          "density": 0.55,
+          "hub_strength": 1.7,
+          "regime": "hub",
+          "weight_distribution": "uniform",
+          "weight_range": [
+            0.5,
+            1.5
+          ]
+        }
+      },
+      {
+        "count": 16,
+        "family": "weak_structure_null",
+        "k": 3,
+        "n": 8,
+        "parameters": {
+          "coefficient_distribution": "zero_mean_gaussian",
+          "coefficient_scale": 1.0,
+          "density": 0.35,
+          "regime": "sparse",
+          "scale_normalization": "sqrt(max(1,density*(n-1)))"
+        }
+      },
+      {
+        "count": 16,
+        "family": "weak_structure_null",
+        "k": 4,
+        "n": 10,
+        "parameters": {
+          "coefficient_distribution": "zero_mean_gaussian",
+          "coefficient_scale": 1.0,
+          "density": 0.7,
+          "regime": "dense",
+          "scale_normalization": "sqrt(max(1,density*(n-1)))"
+        }
+      }
+    ],
+    "transfer": [
+      {
+        "count": 6,
+        "family": "block_correlated",
+        "k": 5,
+        "n": 12,
+        "parameters": {
+          "block_strength": 0.65,
+          "cross_strength": 0.18,
+          "linear_scale": 0.55,
+          "n_blocks": 2,
+          "regime": "moderate"
+        }
+      },
+      {
+        "count": 6,
+        "family": "block_correlated",
+        "k": 4,
+        "n": 12,
+        "parameters": {
+          "block_strength": 0.82,
+          "cross_strength": 0.12,
+          "linear_scale": 0.55,
+          "n_blocks": 3,
+          "regime": "strong"
+        }
+      },
+      {
+        "count": 6,
+        "family": "densest_k_subgraph",
+        "k": 5,
+        "n": 12,
+        "parameters": {
+          "density": 0.45,
+          "planted_community_strength": 1.35,
+          "regime": "moderate",
+          "weight_distribution": "uniform",
+          "weight_range": [
+            0.5,
+            1.5
+          ]
+        }
+      },
+      {
+        "count": 6,
+        "family": "densest_k_subgraph",
+        "k": 4,
+        "n": 12,
+        "parameters": {
+          "density": 0.6,
+          "planted_community_strength": 1.8,
+          "regime": "strong",
+          "weight_distribution": "uniform",
+          "weight_range": [
+            0.5,
+            1.5
+          ]
+        }
+      },
+      {
+        "count": 6,
+        "family": "max_k_vertex_cover",
+        "k": 5,
+        "n": 12,
+        "parameters": {
+          "community_strength": 1.5,
+          "density": 0.4,
+          "hub_strength": 1.0,
+          "regime": "community",
+          "weight_distribution": "uniform",
+          "weight_range": [
+            0.5,
+            1.5
+          ]
+        }
+      },
+      {
+        "count": 6,
+        "family": "max_k_vertex_cover",
+        "k": 4,
+        "n": 12,
+        "parameters": {
+          "community_strength": 1.0,
+          "density": 0.55,
+          "hub_strength": 1.7,
+          "regime": "hub",
+          "weight_distribution": "uniform",
+          "weight_range": [
+            0.5,
+            1.5
+          ]
+        }
+      },
+      {
+        "count": 6,
+        "family": "weak_structure_null",
+        "k": 5,
+        "n": 12,
+        "parameters": {
+          "coefficient_distribution": "zero_mean_gaussian",
+          "coefficient_scale": 1.0,
+          "density": 0.35,
+          "regime": "sparse",
+          "scale_normalization": "sqrt(max(1,density*(n-1)))"
+        }
+      },
+      {
+        "count": 6,
+        "family": "weak_structure_null",
+        "k": 4,
+        "n": 12,
+        "parameters": {
+          "coefficient_distribution": "zero_mean_gaussian",
+          "coefficient_scale": 1.0,
+          "density": 0.7,
+          "regime": "dense",
+          "scale_normalization": "sqrt(max(1,density*(n-1)))"
+        }
+      }
+    ],
+    "validation": [
+      {
+        "count": 8,
+        "family": "block_correlated",
+        "k": 3,
+        "n": 8,
+        "parameters": {
+          "block_strength": 0.65,
+          "cross_strength": 0.18,
+          "linear_scale": 0.55,
+          "n_blocks": 2,
+          "regime": "moderate"
+        }
+      },
+      {
+        "count": 8,
+        "family": "block_correlated",
+        "k": 4,
+        "n": 10,
+        "parameters": {
+          "block_strength": 0.82,
+          "cross_strength": 0.12,
+          "linear_scale": 0.55,
+          "n_blocks": 3,
+          "regime": "strong"
+        }
+      },
+      {
+        "count": 8,
+        "family": "densest_k_subgraph",
+        "k": 3,
+        "n": 8,
+        "parameters": {
+          "density": 0.45,
+          "planted_community_strength": 1.35,
+          "regime": "moderate",
+          "weight_distribution": "uniform",
+          "weight_range": [
+            0.5,
+            1.5
+          ]
+        }
+      },
+      {
+        "count": 8,
+        "family": "densest_k_subgraph",
+        "k": 4,
+        "n": 10,
+        "parameters": {
+          "density": 0.6,
+          "planted_community_strength": 1.8,
+          "regime": "strong",
+          "weight_distribution": "uniform",
+          "weight_range": [
+            0.5,
+            1.5
+          ]
+        }
+      },
+      {
+        "count": 8,
+        "family": "max_k_vertex_cover",
+        "k": 3,
+        "n": 8,
+        "parameters": {
+          "community_strength": 1.5,
+          "density": 0.4,
+          "hub_strength": 1.0,
+          "regime": "community",
+          "weight_distribution": "uniform",
+          "weight_range": [
+            0.5,
+            1.5
+          ]
+        }
+      },
+      {
+        "count": 8,
+        "family": "max_k_vertex_cover",
+        "k": 4,
+        "n": 10,
+        "parameters": {
+          "community_strength": 1.0,
+          "density": 0.55,
+          "hub_strength": 1.7,
+          "regime": "hub",
+          "weight_distribution": "uniform",
+          "weight_range": [
+            0.5,
+            1.5
+          ]
+        }
+      },
+      {
+        "count": 8,
+        "family": "weak_structure_null",
+        "k": 3,
+        "n": 8,
+        "parameters": {
+          "coefficient_distribution": "zero_mean_gaussian",
+          "coefficient_scale": 1.0,
+          "density": 0.35,
+          "regime": "sparse",
+          "scale_normalization": "sqrt(max(1,density*(n-1)))"
+        }
+      },
+      {
+        "count": 8,
+        "family": "weak_structure_null",
+        "k": 4,
+        "n": 10,
+        "parameters": {
+          "coefficient_distribution": "zero_mean_gaussian",
+          "coefficient_scale": 1.0,
+          "density": 0.7,
+          "regime": "dense",
+          "scale_normalization": "sqrt(max(1,density*(n-1)))"
+        }
+      }
+    ]
+  },
+  "status": "DRAFT_UNFROZEN"
+}
