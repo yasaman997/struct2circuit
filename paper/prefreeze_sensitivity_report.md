@@ -1,107 +1,107 @@
 # Pre-freeze synthetic sensitivity report
 
-**Status:** synthetic design analysis only; exploratory, not mixer-performance
-evidence, not a benchmark freeze, and not authorization to begin Stage 2.
+**Status:** corrected synthetic smoke test only; not mixer-performance evidence,
+not a benchmark freeze, and not authorization to begin Stage 2.
 
-## Question and methods
+## Scope and smoke configuration
 
-This checkpoint asks whether candidate family totals and analysis procedures could
-support the claim that structure improves the feasible-range normalized expectation
-gap against both equal-budget baselines in at least two of three structured families.
-The unit is one independent hypothetical QUBO instance, represented only by a
-synthetic paired difference. No QUBO, manifest record, blind/transfer outcome, or
-mixer experiment was generated or accessed.
+This checkpoint tests statistical-analysis plumbing using synthetic paired
+normalized-gap differences. It generated no QUBO, loaded no benchmark or blind/
+transfer record, and ran no mixer optimization. One hypothetical independent
+instance remains the experimental unit. Positive differences favor structure.
 
-The run used seed `20260903`, 100 Monte Carlo repetitions per grid point, 199
-stratified bootstrap resamples, a target Monte Carlo standard error of `0.05`,
-random-baseline standard deviation `0.003`, and a 300-second deterministic cap.
-All 96 grid points completed in 66.9 seconds on the development container. The
-largest reported binomial Monte Carlo standard error is `0.05`; differences of a
-few percentage points are therefore not resolved and require a higher-precision run.
+The checked-in smoke result used seed `20260903`, eight Monte Carlo repetitions per
+grid point, 199 stratified bootstrap resamples, target MCSE `0.20`, expected-random
+estimator-error SD `0.003`, and a 180-second wall-clock safety cap. All 336 points
+completed in 19.2 seconds in the development container. The 336 points cross four
+candidate totals, four effects, seven scenarios, and low/medium/high dispersion.
+With only eight repetitions, the maximum binomial MCSE is approximately `0.177`;
+the smoke estimates must **not** select sample sizes or analysis procedures.
 
-“Sign simultaneous” applies exact sign inference and `alpha/6` one-sided order-
-statistic bounds to all six comparisons. “Sign hierarchical” takes the larger
-p-value within each family, applies Holm across the three family hypotheses, and
-also requires conservative `alpha/3` family bounds. Bootstrap analogues use the
-same logic with resampling within four cells. Wilcoxon uses a tie-adjusted normal
-signed-rank approximation only as a deliberately secondary sensitivity analysis;
-it is not a test of the median under skewness.
+## Corrected data model
 
-## Calibration summary
+For a structured family, the latent per-instance improvement is the requested
+effect plus instance-level noise. The ring observation equals that latent value.
+Only the expected-random observation receives additional independent Gaussian
+error, representing uncertainty from finitely many random-connected baseline
+replicates. That measurement error has configured SD `random_baseline_sd`; it is
+not part of the latent expected-random median estimand. Both target medians are the
+requested effect before a failure intervention. Under skewness, the simulator
+still audits inference for the declared latent-median target and exposes any
+distortion introduced by baseline-estimation error.
 
-The table reports the worst observed value over sizes and distribution scenarios.
-“Coverage” is the lowest observed simultaneous family lower-bound coverage. These
-are Monte Carlo estimates, not guarantees.
+The null control is a fourth, independently seeded effect-zero synthetic family.
+It cannot satisfy the two-of-three structured gate. Its two comparisons alone are
+tested against the provisional practical margin `0.005`; changing structured
+effects does not change its `(0, 0)` population target.
 
-| Procedure | Maximum global-null FWER | Maximum mixed-config false-family rate | Minimum lower-bound coverage | Checkpoint interpretation |
+The `optimizer_failure` scenario replaces both comparisons with zero on failed
+instances. This is a **neutral-value sensitivity convention**, not intention-to-
+treat and not inherently conservative. The additional `structure_failure`
+scenario assigns a prespecified negative improvement (`-0.40`) and is the adverse,
+conservative stress test for a favorable structure claim. Neither convention is
+approved for real evaluation.
+
+## Procedures and compatible success criteria
+
+- The exact sign/order-statistic candidate counts ties as non-positive.
+- Six-comparison simultaneous inference applies `alpha/6` to all three-family by
+  two-baseline comparisons.
+- Hierarchical inference forms an intersection-union family p-value from the worse
+  baseline comparison and then applies Holm across three structured families;
+  conservative `alpha/3` family bounds must also clear zero.
+- Percentile-bootstrap p-values and lower quantiles must agree before rejection.
+  The bootstrap remains **unapproved** because percentile median inference has not
+  demonstrated joint coverage in discrete, skewed, or failure cases.
+- Wilcoxon-Holm remains secondary and is not interpreted as a general median test.
+
+Coverage is now a repetition-level event. The simultaneous procedure counts a
+repetition covered only if all six lower bounds cover their six targets. The
+hierarchical procedure first takes each family's worse (minimum) lower bound and
+then requires all three family bounds to cover. Coverage is no longer an average
+of marginal family indicators.
+
+## Smoke diagnostics—not calibration results
+
+Across the 336 extremely small smoke cells, observed maxima/minima were:
+
+| Procedure | Max global-null false-family rate | Max mixed false-family rate | Min joint coverage | Interpretation |
 | --- | ---: | ---: | ---: | --- |
-| Sign, six-comparison simultaneous | 0.04 | 0.02 | 0.93 | Best-calibrated candidate, but worst observed coverage is below 0.95 at this precision |
-| Sign, hierarchical IUT-Holm | 0.10 | 0.03 | 0.96 | Coverage promising; observed global-null maximum requires higher-precision diagnosis |
-| Stratified bootstrap, simultaneous | 0.05 | 0.01 | 0.87 | Coverage failure; do not approve as implemented |
-| Stratified bootstrap, hierarchical IUT-Holm | 0.12 | 0.05 | 0.80 | FWER/coverage failure; do not approve as implemented |
-| Wilcoxon hierarchical IUT-Holm, secondary | 0.60 | 0.46 | Not applicable | Invalid in tie/skew stress cases; confirms it must not be primary |
+| Sign simultaneous | 0.125 | 0.125 | 0.750 | Plumbing exercised; precision is inadequate |
+| Sign hierarchical IUT-Holm | 0.250 | 0.125 | 0.750 | Plumbing exercised; precision is inadequate |
+| Bootstrap simultaneous | 0.125 | 0.125 | 0.625 | Unapproved; prior under-coverage concern remains |
+| Bootstrap hierarchical IUT-Holm | 0.250 | 0.250 | 0.750 | Unapproved; prior under-coverage concern remains |
+| Wilcoxon hierarchical, secondary | 0.875 | 0.625 | Not applicable | Sensitivity only; not a median procedure |
 
-The global-null maximum is selected across 24 null cells, so a single 100-run cell
-can look high by Monte Carlo noise. Nevertheless, pre-freeze approval requires
-positive evidence of calibration, not an assumption that an unfavorable result is
-noise. The bootstrap particularly under-covered in discrete/failure regimes; its
-nominal p-values and quantile bounds are therefore not approved. Tests and interval
-criteria were evaluated jointly: a family counted only when both corrected tests
-rejected and compatible lower bounds exceeded zero.
-
-## Power and sample-size sensitivity
-
-Worst-case power across the six distributions is intentionally stringent. It is
-the probability that at least two families, each against both baselines, pass both
-the test and confidence-bound criteria while a third family remains null.
-
-| Effect | Total 32 | Total 48 | Total 64 | Total 96 | Reading |
-| --- | ---: | ---: | ---: | ---: | --- |
-| 0.005 | 0.00 | 0.00 | 0.00 | 0.00 | No candidate total is robust to ties/failures at this small effect |
-| 0.010 | 0.02 | 0.07 | 0.14 | 0.39 | Simultaneous sign procedure remains underpowered in the worst case |
-| 0.015 | 0.21 | 0.58 | 0.86 | 1.00 | Totals 64–96 are promising only for this larger effect |
-
-These values use the best-calibrated six-comparison sign candidate. For Gaussian
-differences alone its power at effects `0.010`/`0.015` was respectively `0.15/0.80`
-at 32, `0.52/0.98` at 48, `0.80/1.00` at 64, and `0.98/1.00` at 96. Distributional
-assumptions therefore dominate any single count recommendation. The hierarchical
-sign procedure was generally more powerful, but its global-null audit is unresolved.
-
-## Null negative-control diagnostic
-
-The simulator evaluates the null separately against a candidate practical margin
-of `0.005`, requiring both baseline comparisons to clear corrected sign bounds.
-This diagnostic cannot count toward the two-family gate. The margin and the
-optimizer-failure assignment remain candidates, not frozen decisions. Rows named
-`null_sign_candidate_margin_0.005` in the JSON expose the full scenario-by-size
-operating characteristics for human review.
+Values move in increments of `0.125`, and selecting extrema across hundreds of
+cells compounds Monte Carlo noise. These numbers verify serialization and branch
+logic only; they neither establish nor refute nominal FWER or coverage. The null
+margin diagnostic produced no positive declarations in this smoke run, also with
+insufficient precision for a scientific conclusion.
 
 ## Plain-language decision table
 
-| Human decision | Evidence from this run | Recommendation now |
+| Human decision | Corrected evidence | Decision now |
 | --- | --- | --- |
-| Freeze a family total? | No total combines demonstrated calibration and robust power over all stress scenarios | **No—do not write final counts** |
-| Use sign/order-statistic inference? | Strongest calibration; exact and distribution-free, with conservative ties | Retain as leading candidate; rerun calibration at much smaller MCSE |
-| Use stratified percentile bootstrap? | Material under-coverage, despite preserving four-cell counts | Reject this implementation or replace it and revalidate coverage |
-| Use Wilcoxon-Holm as primary? | Severe false-positive behavior in asymmetric/tie cases; it targets a signed-rank functional, not a general median | No; secondary only if symmetry is prospectively justified |
-| Prefer hierarchical IUT-Holm? | More power, but a global-null cell reached FWER 0.10 | Do not approve until a higher-precision audit resolves calibration |
-| Freeze null margin `0.005`? | Tooling supports it, but there is no scientific utility elicitation yet | Keep provisional |
-| Begin Checkpoint 2 or Stage 2? | Checkpoint 1 has unresolved method/count choices | Stop for human scientific review |
+| Freeze a family total? | Smoke run has only eight repetitions per point | **No** |
+| Approve sign/order-statistic inference? | Logic and joint coverage accounting are corrected | Retain for high-precision validation |
+| Approve percentile bootstrap? | Test/bound compatibility is enforced, but coverage remains unvalidated | **No; unapproved candidate** |
+| Use Wilcoxon-Holm as primary? | It is not a general median test under skewness | **No; secondary only** |
+| Freeze null margin `0.005`? | Independent diagnostic exists, but no utility elicitation exists | Keep provisional |
+| Freeze a failure rule? | Neutral and adverse conventions are stress tests only | **No** |
+| Begin Checkpoint 2 or Stage 2? | Calibration and scientific thresholds remain unresolved | **No; stop for review** |
 
-## Limitations and next decision gate
+## Unresolved statistical decisions
 
-- Synthetic scales and failure mechanisms are design stress tests, not estimates
-  from benchmark performance. They cannot establish that any real effect exists.
-- One hundred repetitions give coarse error estimates and maxima across many cells
-  are noisy. A reviewed procedure should be rerun with enough repetitions for an
-  MCSE near `0.005` before freezing.
-- Percentile bootstrap intervals are not repaired merely by adding resamples; an
-  alternative calibrated stratified construction may be required.
-- Baseline errors share an instance component in the simulator, but the dependence
-  and random-baseline variance are assumptions.
-- The ITT assignment of zero improvement is conservative for a favorable claim but
-  must match an operational optimizer-failure definition before use.
+1. Select acceptable FWER, joint-coverage, power, and MCSE thresholds before a
+   higher-precision synthetic run.
+2. Decide whether expected-random replicate counts make SD `0.003` plausible, or
+   specify a variance model tied to the number of random graphs.
+3. Replace or reject percentile bootstrap inference after adequate joint-coverage
+   validation; increasing resample count alone does not repair poor coverage.
+4. Define optimizer failure operationally and freeze a real-data retention/
+   imputation rule; neither synthetic replacement is automatically appropriate.
+5. Decide whether the candidate null margin `0.005` represents meaningful utility.
 
-The next decision is human: choose the procedures worth recalibrating, define
-acceptable FWER/coverage/power thresholds and the null margin, and authorize a
-higher-precision synthetic run. No benchmark count is selected by this report.
+No candidate total or final procedure is selected. Benchmark v1 remains
+`DRAFT_UNFROZEN`, and a human must authorize any higher-precision calibration.

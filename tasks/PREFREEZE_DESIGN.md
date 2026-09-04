@@ -51,25 +51,38 @@ blind or transfer records, and changing a frozen item requires a versioned amend
 - A rejection counts only when its corresponding corrected one-sided lower bound
   is also above zero. Hierarchical confidence bounds use the conservative `alpha/3`
   family allocation, so they cannot make a Holm decision more permissive.
-- Exact sign inference treats equality as non-positive. Optimizer failures are
-  retained under intention-to-treat and assigned `0.0` improvement in the candidate
-  simulation rule. This failure rule must itself be frozen before real evaluation.
+- Exact sign inference treats equality as non-positive. The simulator labels a
+  zero replacement as a **neutral-value failure sensitivity**, not intention-to-
+  treat. A separate conservative stress test assigns failed structure runs a
+  negative improvement. An operational failure rule remains unfrozen.
 
 ## Sensitivity grid and safeguards
 
 The simulator uses totals `32`, `48`, `64`, and `96`, each balanced over four
 size/regime cells; location effects `0`, `0.005`, `0.010`, and `0.015`; and Gaussian,
 heavy-tailed, skewed, heterogeneous-regime, rounded-tie, and optimizer-failure
-distributions. Random-baseline uncertainty is a configurable variance component.
+distributions, including neutral and adverse structure-failure variants. Every
+case is crossed with explicit low (`0.67`), medium (`1.0`), and high (`1.5`)
+dispersion multipliers. Random-baseline uncertainty is a configurable measurement
+component applied only to the expected-random comparison.
 Positive-effect runs use two alternative families and one null family, directly
 auditing mixed configurations as well as the global-null runs.
 
+For each structured family, a latent paired difference equals the requested median
+effect plus instance noise. The ring observation is that latent difference. The
+expected-random observation adds independent zero-mean estimator error representing
+finite random-graph replication; that error is not part of the expected-random
+estimand. A fourth, independently seeded effect-zero family supplies the null
+diagnostic and never enters the structured success gate.
+
 Monte Carlo work proceeds in batches and stops adaptively after the requested
-Monte Carlo standard error or maximum repetitions. A monotonic wall-clock cap is
-mandatory. Bootstrap draws are vectorized within strata; the implementation does
+Monte Carlo standard error or maximum repetitions. A monotonic wall-clock safety
+cap is mandatory but is not a deterministic stopping rule across machines. A run
+that reaches it is explicitly marked partial, including a valid zero-row result if
+the first repetition never starts. Bootstrap draws are vectorized within strata; the implementation does
 not nest 10,000 simulations inside 20,000 resamples. Every public stochastic entry
-point requires a seed. Serialized output omits observed wall time to remain byte
-reproducible; the CLI prints observed runtime separately.
+point requires a seed. Completed seeded runs are byte reproducible; serialized
+output omits observed wall time and the CLI prints it separately.
 
 ## Decision gate
 
