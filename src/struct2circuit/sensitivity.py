@@ -274,7 +274,7 @@ def _wilcoxon_normal_pvalue(values: np.ndarray) -> float:
     n = len(values)
     mean = n * (n + 1) / 4
     _, counts = np.unique(np.abs(values), return_counts=True)
-    variance = (n * (n + 1) * (2 * n + 1) - np.sum(counts**3 - counts)) / 24
+    variance = (n * (n + 1) * (2 * n + 1) - 0.5 * np.sum(counts**3 - counts)) / 24
     return 1.0 if variance <= 0 else float(norm.sf((positive - mean - 0.5) / math.sqrt(variance)))
 
 
