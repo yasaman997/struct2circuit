@@ -13,10 +13,12 @@ instance remains the experimental unit. Positive differences favor structure.
 The checked-in smoke result used seed `20260903`, eight Monte Carlo repetitions per
 grid point, 199 stratified bootstrap resamples, target MCSE `0.20`, expected-random
 estimator-error SD `0.003`, and a 180-second wall-clock safety cap. All 336 points
-completed in 19.2 seconds in the development container. The 336 points cross four
+completed in 18.3 seconds in the development container. The 336 points cross four
 candidate totals, four effects, seven scenarios, and low/medium/high dispersion.
-With only eight repetitions, the maximum binomial MCSE is approximately `0.177`;
+With only eight repetitions, the achieved worst-case precision is approximately `0.177`;
 the smoke estimates must **not** select sample sizes or analysis procedures.
+Here `0.177` is the conservative worst-case Bernoulli precision bound
+`0.5/sqrt(8)`, not a plug-in estimate based on an observed rate.
 
 ## Corrected data model
 
@@ -33,7 +35,10 @@ distortion introduced by baseline-estimation error.
 The null control is a fourth, independently seeded effect-zero synthetic family.
 It cannot satisfy the two-of-three structured gate. Its two comparisons alone are
 tested against the provisional practical margin `0.005`; changing structured
-effects does not change its `(0, 0)` population target.
+effects does not change its `(0, 0)` population target. It uses the same underlying
+distribution and dispersion as the associated grid cell, but structured-method
+failure replacements are disabled for the null. Thus even the
+`structure_failure` stress retains null targets `(0, 0)`.
 
 The `optimizer_failure` scenario replaces both comparisons with zero on failed
 instances. This is a **neutral-value sensitivity convention**, not intention-to-
@@ -60,6 +65,14 @@ repetition covered only if all six lower bounds cover their six targets. The
 hierarchical procedure first takes each family's worse (minimum) lower bound and
 then requires all three family bounds to cover. Coverage is no longer an average
 of marginal family indicators.
+
+Adaptive stopping monitors every decision-relevant Bernoulli outcome: overall
+success, false rejection/FWER, joint coverage, and the independent null-margin
+diagnostic. It uses `0.5/sqrt(repetitions)` for all of them, so an observed rate of
+zero or one cannot imply zero Monte Carlo uncertainty. Each machine-readable row
+records this achieved precision and whether stopping occurred because of the
+precision target, maximum repetitions, or runtime cap. Per-estimate MCSE fields
+also report this conservative bound rather than a zero-at-endpoints plug-in value.
 
 ## Smoke diagnostics—not calibration results
 

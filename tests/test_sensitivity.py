@@ -11,7 +11,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from struct2circuit.sensitivity import (  # noqa: E402
-    SensitivityConfig, conservative_sign_pvalue, generate_synthetic_comparison,
+    DISPERSION_MULTIPLIERS, SCENARIOS, SensitivityConfig,
+    conservative_mc_precision, conservative_sign_pvalue, generate_synthetic_comparison,
     generate_synthetic_repetition,
     holm_rejections, joint_lower_bound_coverage, null_control_truth,
     run_sensitivity, sign_median_lower_bound, stratified_bootstrap_median,
@@ -66,6 +67,23 @@ class SensitivityTests(unittest.TestCase):
         self.assertTrue(np.array_equal(first_null.ring, second_null.ring))
         self.assertTrue(np.array_equal(first_null.expected_random, second_null.expected_random))
 
+    def test_null_truth_is_zero_for_every_scenario_and_dispersion(self) -> None:
+        config = SensitivityConfig(failure_rate=1.0)
+        for scenario in SCENARIOS:
+            for dispersion in DISPERSION_MULTIPLIERS:
+                with self.subTest(scenario=scenario, dispersion=dispersion):
+                    _, null, _ = generate_synthetic_repetition(
+                        seed=83, total=32,
+                        structured_effects=(0.015, 0.010, 0.005),
+                        scenario=scenario, dispersion=dispersion, config=config,
+                    )
+                    self.assertEqual(
+                        (null.ring_truth, null.expected_random_truth),
+                        null_control_truth(),
+                    )
+                    if scenario == "structure_failure":
+                        self.assertFalse(np.all(null.ring == config.structure_failure_value))
+
     def test_random_baseline_uncertainty_affects_only_random_comparison(self) -> None:
         zero = SensitivityConfig(random_baseline_sd=0.0)
         positive = SensitivityConfig(random_baseline_sd=0.02)
@@ -112,6 +130,27 @@ class SensitivityTests(unittest.TestCase):
         self.assertEqual(first, second)
         self.assertEqual(first["completed_grid_points"], first["planned_grid_points"])
         self.assertEqual({row["dispersion"] for row in first["rows"]}, {"low", "high"})
+        self.assertEqual(
+            first["design"]["null_control_population_targets"],
+            {"ring": 0.0, "expected_random": 0.0},
+        )
+
+    def test_endpoint_rates_do_not_claim_zero_precision_or_stop_early(self) -> None:
+        config = SensitivityConfig(
+            seed=5, bootstrap_samples=19, min_repetitions=2,
+            max_repetitions=5, batch_size=1, target_mcse=0.10,
+            runtime_cap_seconds=30, failure_rate=1.0,
+        )
+        result = run_sensitivity(
+            config, family_totals=(32,), effects=(0.0,),
+            scenarios=("structure_failure",), dispersions=("low",),
+        )
+        self.assertTrue(all(row["repetitions"] == 5 for row in result["rows"]))
+        self.assertTrue(all(row["stopping_reason"] == "max_repetitions" for row in result["rows"]))
+        self.assertTrue(all(row["achieved_mc_precision"] > config.target_mcse for row in result["rows"]))
+        self.assertTrue(all(row["success_mcse"] > 0 for row in result["rows"]))
+        self.assertTrue(all(row["fwer_mcse"] > 0 for row in result["rows"] if row["fwer_mcse"] is not None))
+        self.assertAlmostEqual(conservative_mc_precision(5), 0.5 / np.sqrt(5))
 
     def test_runtime_cap_before_first_repetition_returns_valid_partial_result(self) -> None:
         config = SensitivityConfig(runtime_cap_seconds=0.5)

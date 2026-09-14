@@ -73,11 +73,18 @@ effect plus instance noise. The ring observation is that latent difference. The
 expected-random observation adds independent zero-mean estimator error representing
 finite random-graph replication; that error is not part of the expected-random
 estimand. A fourth, independently seeded effect-zero family supplies the null
-diagnostic and never enters the structured success gate.
+diagnostic and never enters the structured success gate. It retains the same
+distributional and dispersion stress but never receives the neutral or adverse
+structured-method failure intervention, so both declared null targets remain zero.
 
 Monte Carlo work proceeds in batches and stops adaptively after the requested
-Monte Carlo standard error or maximum repetitions. A monotonic wall-clock safety
-cap is mandatory but is not a deterministic stopping rule across machines. A run
+precision or maximum repetitions. The stopping precision is the conservative
+worst-case Bernoulli standard-error bound `0.5 / sqrt(repetitions)`, applied to
+success, false-rejection/FWER, joint coverage, and the null-margin diagnostic.
+Unlike a plug-in MCSE, observed zero or one rates cannot claim zero uncertainty.
+Every result row records achieved precision and stopping reason; reported MCSE
+fields use the same conservative bound rather than a zero-at-endpoints plug-in.
+A monotonic wall-clock safety cap is mandatory but is not a deterministic stopping rule across machines. A run
 that reaches it is explicitly marked partial, including a valid zero-row result if
 the first repetition never starts. Bootstrap draws are vectorized within strata; the implementation does
 not nest 10,000 simulations inside 20,000 resamples. Every public stochastic entry

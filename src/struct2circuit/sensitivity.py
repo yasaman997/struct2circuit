@@ -173,6 +173,7 @@ def _difference_noise(
 def generate_synthetic_comparison(
     *, seed: int, total: int, effect: float, scenario: str,
     dispersion: str, config: SensitivityConfig,
+    apply_failure_intervention: bool = True,
 ) -> tuple[SyntheticComparison, np.ndarray]:
     """Generate ring and expected-random comparisons for one family.
 
@@ -200,7 +201,7 @@ def generate_synthetic_comparison(
     ring = latent.copy()
     expected_random = latent + rng.normal(0, config.random_baseline_sd, total)
     truth = effect
-    if scenario in {"optimizer_failure", "structure_failure"}:
+    if apply_failure_intervention and scenario in {"optimizer_failure", "structure_failure"}:
         failed = rng.random(total) < config.failure_rate
         replacement = (
             config.neutral_failure_value if scenario == "optimizer_failure"
@@ -262,6 +263,7 @@ def generate_synthetic_repetition(
     null, cells = generate_synthetic_comparison(
         seed=int(children[3].generate_state(1, dtype=np.uint64)[0]), total=total,
         effect=0.0, scenario=scenario, dispersion=dispersion, config=config,
+        apply_failure_intervention=False,
     )
     return structured, null, cells
 
@@ -331,8 +333,18 @@ def _method_decisions(
 
 
 def _mcse(successes: int, repetitions: int) -> float:
-    rate = successes / repetitions
-    return math.sqrt(rate * (1 - rate) / repetitions)
+    """Conservative MCSE bound; ``successes`` is retained for call-site clarity."""
+
+    del successes
+    return conservative_mc_precision(repetitions)
+
+
+def conservative_mc_precision(repetitions: int) -> float:
+    """Worst-case standard error bound for any Bernoulli proportion."""
+
+    if repetitions <= 0:
+        raise ValueError("repetitions must be positive")
+    return 0.5 / math.sqrt(repetitions)
 
 
 def run_sensitivity(
@@ -362,6 +374,7 @@ def run_sensitivity(
         counts: dict[str, list[int]] = {}
         null_margin_positives = 0
         repetitions = 0
+        stopping_reason = "max_repetitions"
         while repetitions < config.max_repetitions:
             if time.monotonic() - started >= config.runtime_cap_seconds:
                 capped = True
@@ -392,10 +405,11 @@ def run_sensitivity(
                 completed_in_batch += 1
             repetitions += completed_in_batch
             if capped:
+                stopping_reason = "runtime_cap"
                 break
             if repetitions >= config.min_repetitions:
-                monitored = [value / repetitions for slot in counts.values() for value in slot[:2]]
-                if max(math.sqrt(rate * (1 - rate) / repetitions) for rate in monitored) <= config.target_mcse:
+                if conservative_mc_precision(repetitions) <= config.target_mcse:
+                    stopping_reason = "target_precision"
                     break
         # If the cap expires before this point has any repetitions, omit it. This
         # produces an explicit, valid partial result rather than dividing by zero.
@@ -407,6 +421,9 @@ def run_sensitivity(
             "dispersion_multiplier": DISPERSION_MULTIPLIERS[dispersion],
             "random_baseline_sd": config.random_baseline_sd,
             "repetitions": repetitions,
+            "achieved_mc_precision": conservative_mc_precision(repetitions),
+            "precision_method": "worst_case_bernoulli_0.5_over_sqrt_n",
+            "stopping_reason": stopping_reason,
         }
         for method, (successes, false_rejections, coverage_successes) in counts.items():
             rows.append({
@@ -438,6 +455,13 @@ def run_sensitivity(
             "scenarios": scenarios, "dispersions": dispersions,
             "dispersion_multipliers": DISPERSION_MULTIPLIERS, "cells": 4,
             "null_margin_candidate": NULL_MARGIN,
+            "null_control_population_targets": {"ring": 0.0, "expected_random": 0.0},
+            "null_control_failure_interventions": False,
+            "precision_method": "worst_case_bernoulli_0.5_over_sqrt_n",
+            "precision_monitors": [
+                "success_probability", "false_rejection_fwer",
+                "joint_lower_bound_coverage", "null_margin_diagnostic",
+            ],
         },
         "completed_grid_points": completed,
         "planned_grid_points": len(grid),
