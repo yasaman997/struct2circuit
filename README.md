@@ -20,17 +20,7 @@ A variational quantum algorithm does not operate independently of the problem it
 
 Struct2Circuit studies this interaction by comparing **problem-informed** and **structure-agnostic** feasible mixers.
 
-For cardinality-constrained QUBOs,
-
-\[
-\min_x C_Q(x)
-\qquad
-\text{subject to}
-\qquad
-\sum_i x_i=k,
-\]
-
-the mixer must preserve the feasible Hamming-weight-`k` subspace.
+For cardinality-constrained QUBOs, we consider the optimization problem:\n\n**Minimize:** `C_Q(x)`\n\n**Subject to:** `Σᵢ xᵢ = k`\n\nwith `x ∈ {0, 1}ⁿ`. The constraint fixes the Hamming weight to `k`, so the mixer must preserve this feasible subspace.\n\n the feasible Hamming-weight-`k` subspace.
 
 The current study therefore follows:
 
