@@ -1,6 +1,6 @@
 # Struct2Circuit: start here
 
-> **Professor-facing entry point:** start with [README.md](README.md). This page is a compact orientation guide for the repository's current scientific scope and status.
+> **Project entry point:** start with [README.md](README.md). This page is a compact orientation guide for the repository's current scientific scope and status.
 
 ## The current question
 
@@ -62,7 +62,7 @@ The next scientific step is review of the pre-freeze statistical specification a
 
 ## Where to look
 
-- README.md — professor-facing overview and current scope.
+- README.md — project overview and current scope.
 - paper/research_protocol.md — scientific definitions, estimands, controls, and decision rules.
 - paper/stage_1_prefreeze_report.md — provisional benchmark rationale and cost.
 - tasks/PREFREEZE_DESIGN.md — freeze sequence and approval gates.

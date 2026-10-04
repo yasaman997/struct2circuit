@@ -1,6 +1,6 @@
 # Struct2Circuit
 
-> **Start here:** This README is the professor-facing overview. It states exactly what is implemented, what the pilot shows, what is not yet tested, and what the next scientific decision is. The project deliberately separates the **current study** from later research extensions.
+> **Start here:** This README is the project overview. It states exactly what is implemented, what the pilot shows, what is not yet tested, and what the next scientific decision is. The project deliberately separates the **current study** from later research extensions.
 
 ## Current study
 
