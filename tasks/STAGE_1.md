@@ -15,7 +15,7 @@ Stage 1 contains three sequential checkpoints. Complete and verify each checkpoi
 
 ## Before editing
 
-1. Read `AGENTS.md`, `START_HERE.md`, `paper/research_protocol.md`, `README.md`, the relevant source modules, and the existing tests.
+1. Read `START_HERE.md`, `paper/research_protocol.md`, `README.md`, the relevant source modules, and the existing tests.
 2. Confirm that the working directory is the Struct2Circuit project root.
 3. Check version-control status. The current distributed scaffold may not yet be a Git repository. If Git is absent, initialize a local repository and attempt a baseline commit named `baseline: exploratory pilot v0.1`. Do not change global Git identity settings; if a commit cannot be created, report the blocker and preserve the unmodified baseline by another explicit, non-destructive checkpoint.
 4. Run the existing test suite and record the baseline result.
