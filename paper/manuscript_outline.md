@@ -1,48 +1,53 @@
 # Working manuscript outline
 
-> **Status: prospective outline.** This document describes a possible future paper structure and evaluation plan; it does not represent completed results or an accepted contribution. Claims below are conditional on the outcomes of the planned benchmark.
+> **Status: prospective outline.** This is a future-paper planning document. It does not represent completed results, a frozen protocol, or a publication claim.
 
 ## Working title
 
-**Struct2Circuit: Verified Structure-Conditioned Mixers for Cardinality-Constrained Quantum Optimization**
+**Struct2Circuit: Structure-Conditioned Mixers for Cardinality-Constrained Quantum Optimization**
 
 ## One-sentence contribution
 
-We investigate a verified architecture-search framework that conditions sparse XY-mixer topology on optimization-instance structure and test whether it can improve the quality/resource frontier with transfer to unseen instances, sizes and hardware graphs.
+We investigate whether a transparent |Q_ij|-conditioned sparse XY-mixer generator can improve variational optimization outcomes at a matched edge budget, and whether any observed effect survives independent problem families, unseen instances, and measured circuit-resource accounting.
 
 ## Abstract skeleton
 
-1. **Problem:** constrained QAOA performance depends strongly on a hand-designed mixer, while generic QAS can waste search on infeasible or hardware-expensive circuits.
-2. **Method:** a typed graph grammar guarantees Hamming-weight preservation and connectivity; a structure-conditioned policy proposes sparse mixers under an explicit edge/depth budget.
-3. **Evaluation:** blind paired benchmarks across portfolio-like and graph problems; equal search, shot and transpilation budgets; exact and noisy simulation plus small-device validation.
-4. **Result:** report whatever effect, including null or negative results, survives the locked analysis.
-5. **Meaning:** assess whether QUBO structure predicts useful quantum mixing topology, and characterize regimes where it does not.
-
-## Figures required for a submission
-
-1. Method diagram: instance graph + hardware graph -> verified mixer generator -> QAOA evaluation -> active-learning loop.
-2. Equal-budget paired performance on blind families.
-3. Approximation-quality versus transpiled two-qubit depth Pareto fronts.
-4. Transfer heat map across train/test size, density and hardware.
-5. Ablation and null-ensemble results.
-6. Interpretable motif analysis connecting matrix structure to selected edges.
+1. **Problem:** constrained variational algorithms require a mixer that respects the feasible subspace, and generic structure-agnostic choices may ignore useful information in the optimization instance.
+2. **Method:** construct a connected sparse XY mixer from off-diagonal QUBO interaction magnitudes under a declared edge budget.
+3. **Evaluation:** compare against fixed and random connected mixers across independent problem families with paired instance-level analysis and explicit resource accounting.
+4. **Result:** report the effect actually supported by the locked analysis, including null or negative results.
+5. **Meaning:** determine whether optimization-instance structure provides useful side information for constrained circuit design, and identify regimes in which it does not.
 
 ## Main sections
 
-1. Introduction and falsifiable contribution.
-2. Related work and exact differentiation from QAS, custom mixers and hardware-aware compilation.
-3. Cardinality-constrained problem and invariant-preserving grammar.
-4. Structure-conditioned generator and verifier.
-5. Experimental protocol and matched-budget baselines.
-6. Results: quality, resources, transfer and statistical uncertainty.
-7. Mechanistic interpretation and failure regimes.
-8. Limitations: simulation scale, search amortization, noise drift and absence of broad quantum advantage.
-9. Reproducibility statement.
+1. Introduction and falsifiable hypothesis.
+2. Related work: constrained mixers, problem-informed circuit design, architecture search, and hardware-aware resource accounting.
+3. Cardinality-constrained problem and fixed-weight XY invariant.
+4. Transparent structure-conditioned mixer generator.
+5. Experimental protocol and comparison budgets.
+6. Results: quality, uncertainty, failures, and measured resources.
+7. Generalization by instance, family, scale, and constraint ratio.
+8. Mechanistic analysis, only if directly supported by gradient/trajectory/landscape measurements.
+9. Limitations: noiseless simulation scale, construction cost, resource accounting, and absence of a quantum-advantage claim.
+10. Reproducibility and data/code release.
 
-## Journal decision rule
+## Figures to build only after the corresponding experiments exist
 
-- **PRX Quantum:** only if there is a theorem or a strong cross-family/hardware milestone.
-- **Quantum:** primary target for a significant, rigorous algorithmic result with open code and convincing transfer.
-- **npj Quantum Information:** strong option if real-hardware and broad quantum-information evidence dominate.
-- **Quantum Science and Technology / Physical Review Research:** appropriate if the contribution remains primarily numerical or application-centered.
+1. Method schematic: QUBO interaction graph → verified mixer generator → constrained QAOA.
+2. Paired primary outcome on held-out instances.
+3. Quality versus measured transpiled two-qubit depth/gates.
+4. Separate transfer plots for family, scale, and constraint ratio.
+5. Null-control and ablation results.
+6. Structure-to-selected-edge analysis, with uncertainty.
 
+## Scientific decision rule
+
+The paper should not be written around a positive result in advance.
+
+A credible outcome includes:
+
+- positive effect that survives the declared controls;
+- a mixed result identifying where structure helps and where it does not;
+- or a null result showing that the proposed structural signal does not reliably improve the chosen architecture under the tested budget.
+
+The scientific contribution is the controlled answer to the question, not a predetermined success story.
