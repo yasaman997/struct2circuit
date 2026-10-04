@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "struct2circuit"
 version = "0.1.0"
-description = "Verified structure-conditioned mixers for cardinality-constrained quantum optimization"
+description = "Research code for structure-conditioned mixers in cardinality-constrained quantum optimization"
 requires-python = ">=3.10"
 dependencies = [
   "numpy>=1.26",
@@ -13,7 +13,7 @@ dependencies = [
   "pandas>=2.0",
   "matplotlib>=3.8",
 ]
+keywords = ["quantum optimization", "QAOA", "constrained mixers", "QUBO", "scientific computing"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
-
