@@ -1,84 +1,97 @@
 # Struct2Circuit: start here
 
-> **Project entry point:** start with [README.md](README.md). This page is a compact orientation guide for the repository's current scientific scope and status.
+> **Project entry point:** start with [README.md](README.md). This page is a compact orientation guide to the current scientific question and status.
 
 ## The current question
 
-Struct2Circuit studies one narrow question:
+Struct2Circuit asks:
 
-> **At a fixed number of mixer edges, does a transparent QUBO-conditioned, feasibility-preserving mixer improve variational optimization outcomes over structure-agnostic connected mixers on unseen cardinality-constrained QUBOs?**
+> **Can a transparent pre-optimization instance descriptor select a sparse, feasibility-preserving mixer topology that improves shallow variational optimization over structure-agnostic connected topologies, and under what conditions does that relationship fail?**
 
-The current structure signal is exactly the off-diagonal interaction magnitude |Q_ij|. The generator builds a maximum-weight spanning tree under that score and then adds the strongest remaining edges until the requested edge budget is reached.
+The first descriptor tested is off-diagonal interaction magnitude `|Q_ij|`. The first independent family did not support that rule as a generally useful heuristic.
 
-It does **not** use the linear term, optimal solutions, objective values, solver results, benchmark outcomes, or labels.
+## What the evidence says
 
-This is a study of **constrained circuit design**, not a learned architecture-search system and not a quantum-advantage claim.
+The original 24-instance block-correlated pilot favored the structure-conditioned mixer over the fixed ring on 17/24 instances.
 
-## What is implemented
+The first independent weighted densest-k-subgraph test reversed that pattern: the strong-`|Q_ij|` mixer lost to the ring on 17/24 instances and had the worst median normalized gap among the main three comparators.
 
-### Exploratory pilot
+The important result is therefore not “structure works.” It is:
 
-The deterministic, noiseless pilot uses 24 synthetic block-correlated instances with n=8, k=3, and QAOA depth p=1.
+> **High alignment with QUBO interaction magnitude was not sufficient to improve p=1 QAOA on the independent family.**
 
-The structure-conditioned and ring mixers each use eight edges. The structure-conditioned mixer wins 17 of 24 instances, with median normalized gap changing from 0.112558 to 0.101715.
+## The main experimental correction
 
-A 28-edge complete mixer is shown only as a higher-edge-count reference.
+The original comparison fixed the same uniform feasible initial state for every mixer. That is useful for a fixed-initialization comparison, but it does not isolate topology from mixer/initial-state alignment.
 
-The result is exploratory and family-specific. It does not establish generalization, scaling, hardware performance, trainability, or quantum advantage.
+The simulator now supports two explicit initialization conditions:
 
-### Stage 1 foundations
+- `uniform` — uniform feasible superposition;
+- `mixer_ground` — normalized projection of the uniform feasible state onto the mixer ground-state eigenspace.
 
-Stage 1 implements and tests:
+The alignment control is implemented in:
 
-- an instance-independent random connected mixer with an exact edge budget;
-- additional structured and weak-structure problem generators;
-- deterministic provisional train/validation/blind/transfer manifest tooling;
-- procedural safeguards against accidental blind-record access.
+```text
+experiments/run_alignment_control.py
+```
 
-Benchmark v1 remains DRAFT_UNFROZEN. No blind performance has been evaluated.
+No alignment-control result is currently treated as evidence for the main claim.
 
-### Pre-freeze checkpoint
+## Mechanism status
 
-The repository also contains synthetic-only tooling for statistical sensitivity and inference plumbing.
+The original local `|Q_ij|` intuition was corrected: for a single feasible exchange, the direct `Q_ij x_i x_j` contribution cancels.
 
-The checked-in smoke result uses eight Monte Carlo repetitions per cell and is **not** sufficient to select a sample size, certify power, or approve a final analysis. It exists to exercise the machinery and expose unresolved decisions.
+The remaining hypothesis is graph-level:
 
-## What is deliberately not claimed
+```text
+instance descriptor
+        ↓
+  mixer topology
+        ↓
+feasible-state transition graph
+        ↓
+variational dynamics
+        ↓
+optimization outcome
+```
 
-The repository does not currently claim:
+The missing link is the transition-graph mechanism. See [docs/MECHANISM_HYPOTHESIS.md](docs/MECHANISM_HYPOTHESIS.md).
 
-- a learned quantum architecture;
-- a trainability improvement;
-- a hardware advantage;
-- a quantum advantage;
-- superiority over classical optimization;
-- cross-family or cross-size generalization.
+## Current next step
 
-These are future evaluation targets.
+Do **not** start another large confirmatory benchmark yet.
 
-## Current decision gate
+The next study compares a small predeclared set of structural descriptors—strong/weak `|Q_ij|`, interaction-profile similarity, shuffled controls, and random topology—under explicit initialization controls.
 
-The next scientific step is review of the pre-freeze statistical specification and compute budget. Until those decisions are approved, do not freeze Benchmark v1 or run a final blind comparison.
+The repository already contains statistical sensitivity and pre-freeze infrastructure. Those tools remain available for a later confirmatory study; they are not the current scientific bottleneck.
 
-## Where to look
+## Repository map
 
-- README.md — project overview and current scope.
-- paper/research_protocol.md — scientific definitions, estimands, controls, and decision rules.
-- paper/stage_1_prefreeze_report.md — provisional benchmark rationale and cost.
-- tasks/PREFREEZE_DESIGN.md — freeze sequence and approval gates.
-- paper/prefreeze_sensitivity_report.md — smoke-level statistical diagnostics.
-- src/struct2circuit/ — implementation.
-- tests/ — invariant and integrity tests.
+- `README.md` — project overview, current evidence, and claim boundary.
+- `docs/MECHANISM_HYPOTHESIS.md` — mechanism, controls, and falsification boundary.
+- `docs/LITERATURE_DIFFERENTIATION.md` — closest literature and precise scope.
+- `results/independent_dks_benchmark_v1.md` — first independent benchmark result.
+- `experiments/run_alignment_control.py` — initialization/alignment control.
+- `src/struct2circuit/simulator.py` — exact feasible-subspace simulation and initialization modes.
+- `tests/` — mathematical and implementation invariants.
 
-## Reproduce the verified checks
+## Reproduce the checks
 
-    python3 -m venv .venv
-    source .venv/bin/activate
-    python3 -m pip install -e .
-    python3 -m unittest discover -s tests -v
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python3 -m pip install -e .
+python3 -m unittest discover -s tests -v
+```
 
-The exploratory pilot can be regenerated with:
+The existing pilot can be regenerated with:
 
-    python3 experiments/run_pilot.py --instances 24 --n 8 --k 3
+```bash
+python3 experiments/run_pilot.py --instances 24 --n 8 --k 3
+```
 
-Treat regenerated pilot output as exploratory unless a future benchmark version explicitly says otherwise.
+The alignment-control experiment is exploratory and uses a separate seed namespace:
+
+```bash
+python3 experiments/run_alignment_control.py --instances 24 --n 9 --k 4
+```

@@ -25,21 +25,73 @@ class QAOAResult:
 
 
 class FeasibleSubspaceQAOA:
-    """A small-system simulator with exact feasibility by representation."""
+    """Exact feasible-subspace simulator with explicit initialization control.
 
-    def __init__(self, problem: CardinalityQUBO, mixer: MixerSpec) -> None:
+    ``initialization="uniform"`` is the common baseline used by the pilot.
+    ``initialization="mixer_ground"`` constructs an alignment control by
+    projecting the uniform feasible state onto the ground-state eigenspace of
+    the mixer Hamiltonian. The aligned state is a diagnostic/control, not a
+    claim about hardware-efficient state preparation.
+    """
+
+    def __init__(
+        self,
+        problem: CardinalityQUBO,
+        mixer: MixerSpec,
+        *,
+        initialization: str = "uniform",
+    ) -> None:
         if problem.n != mixer.n:
             raise ValueError("problem and mixer sizes differ")
+        if initialization not in {"uniform", "mixer_ground"}:
+            raise ValueError("initialization must be 'uniform' or 'mixer_ground'")
         self.problem = problem
         self.mixer = mixer
+        self.initialization = initialization
         self.basis = problem.feasible_basis()
         self.costs = problem.costs(self.basis)
         self.cost_min = float(np.min(self.costs))
         self.cost_max = float(np.max(self.costs))
         self.optimal_mask = np.isclose(self.costs, self.cost_min, rtol=0.0, atol=1e-10)
         self.mixer_hamiltonian = xy_mixer_hamiltonian(self.basis, mixer)
-        self._mixer_eigenvalues, self._mixer_eigenvectors = np.linalg.eigh(self.mixer_hamiltonian)
-        self.initial_state = np.full(len(self.basis), 1.0 / np.sqrt(len(self.basis)), dtype=complex)
+        self._mixer_eigenvalues, self._mixer_eigenvectors = np.linalg.eigh(
+            self.mixer_hamiltonian
+        )
+
+        self.uniform_state = np.full(
+            len(self.basis), 1.0 / np.sqrt(len(self.basis)), dtype=complex
+        )
+        ground_mask = np.isclose(
+            self._mixer_eigenvalues,
+            self._mixer_eigenvalues[0],
+            rtol=0.0,
+            atol=1e-10,
+        )
+        ground_basis = self._mixer_eigenvectors[:, ground_mask]
+        projected = ground_basis @ (ground_basis.conj().T @ self.uniform_state)
+        projected_norm = float(np.linalg.norm(projected))
+        if projected_norm <= 1e-14:
+            projected = ground_basis[:, 0]
+            projected_norm = float(np.linalg.norm(projected))
+        self.mixer_ground_state = np.asarray(projected / projected_norm, dtype=complex)
+
+        self.initial_state = (
+            self.uniform_state
+            if initialization == "uniform"
+            else self.mixer_ground_state
+        )
+
+    @property
+    def uniform_mixer_ground_state_fidelity(self) -> float:
+        """Fidelity between the uniform state and the mixer ground space."""
+        ground_mask = np.isclose(
+            self._mixer_eigenvalues,
+            self._mixer_eigenvalues[0],
+            rtol=0.0,
+            atol=1e-10,
+        )
+        overlap = self._mixer_eigenvectors[:, ground_mask].conj().T @ self.uniform_state
+        return float(np.sum(np.abs(overlap) ** 2))
 
     @property
     def feasible_dimension(self) -> int:
@@ -75,4 +127,3 @@ class FeasibleSubspaceQAOA:
             state_norm=float(np.linalg.norm(psi)),
             feasibility_probability=float(np.sum(probabilities)),
         )
-

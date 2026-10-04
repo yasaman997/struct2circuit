@@ -1,165 +1,88 @@
 # Mechanism hypothesis
 
-## 1. Revised hypothesis
+## Current question
 
-The original intuition was too close to a local-transition story: large absolute QUBO coefficients might somehow make the corresponding XY exchange more favorable.
+The project asks whether information from a cardinality-constrained QUBO can be used as side information when choosing a sparse, feasibility-preserving XY mixer topology under a fixed edge budget.
 
-That is not the right mechanism.
+The first score tested was strong `|Q_ij|`. It is now treated as a **candidate heuristic that failed to generalize in the first independent test**, not as an established mechanism.
 
-For a feasible bitstring with xi = 1 and xj = 0, let x' be the bitstring obtained by exchanging those occupations. For symmetric Q,
+## 1. What the first hypothesis got wrong
 
-ΔC = C(x') - C(x)
-   = (Qjj - Qii)
-     + 2 Σ_{l not equal to i,j} xl (Qjl - Qil)
-     + cj - ci.
-
-The Qij term cancels because xi xj = 0 both before and after the swap.
+For a feasible bitstring with `x_i = 1` and `x_j = 0`, exchanging the occupations of `i` and `j` does not change the `Q_ij x_i x_j` term: that term is zero before and after the exchange. The single-exchange objective difference instead depends on diagonal, linear, and differences in the two variables' interactions with the occupied variables.
 
 Therefore:
 
-> A large |Qij| is **not** a direct local-energy-gradient justification for placing an XY edge between i and j.
+> A large `|Q_ij|` is not, by itself, a local-energy-gradient justification for placing an XY edge between `i` and `j`.
 
-This is an important limitation of the present method and should be visible to a serious reader.
+This correction is central to the project.
 
-## 2. The mechanism that remains plausible
+## 2. The narrower remaining hypothesis
 
-The defensible hypothesis is instead a **graph-level topology hypothesis**:
+A defensible hypothesis is graph-level rather than edge-local:
 
-> The off-diagonal QUBO matrix defines an interaction graph. Under a limited number of XY exchange edges, a sparse mixer whose topology preserves strong interaction structure may shape the feasible-state transition graph in a way that is more compatible with the global objective landscape than a structure-agnostic topology.
+> Under a limited number of XY exchange edges, some pre-optimization structural descriptor of the QUBO may select a feasible-state transition graph whose shallow variational dynamics are more compatible with the objective landscape than a structure-agnostic topology.
 
-This is deliberately weaker than saying that a selected edge produces a favorable swap.
+The current causal chain is therefore:
 
-The proposed rule is therefore a graph-approximation heuristic:
+`instance descriptor → mixer topology → feasible-state transition graph → variational dynamics → optimization outcome`
 
-QUBO interaction graph
-→ sparse mixer topology
-→ feasible-state transition graph
-→ shallow variational dynamics
-→ optimization outcome.
+The middle of this chain is still unproven.
 
-The causal link in the middle is the part that remains to be demonstrated.
+## 3. A critical confound: initialization and mixer alignment
 
-## 3. Concrete predictions
+Different XY topologies can have different mixer ground spaces and different spectral structure. The original benchmark used the same uniform feasible initial state for every topology. That makes the comparison clean as a **fixed-initialization benchmark**, but it does not isolate topology from initial-state/mixer alignment.
 
-The hypothesis makes four experimentally testable predictions.
+This matters because recent constrained-QAOA work has shown that initial-state/mixer alignment can affect low-depth performance. The literature map therefore treats alignment as a required control rather than a nuisance detail.
 
-### P1 — structural alignment
+The simulator now exposes two explicit initialization modes:
 
-At the same edge budget, the strong-|Qij| mixer should have much higher interaction-weight alignment with the target QUBO than ring or random connected mixers.
+- `uniform`: uniform superposition over all feasible weight-`k` states;
+- `mixer_ground`: the normalized projection of the uniform feasible state onto the mixer Hamiltonian's ground-state eigenspace.
 
-This is almost guaranteed by construction and is therefore a **sanity check**, not evidence of usefulness.
+The second mode is an exact diagnostic/control in the small-system simulator. It is **not** being presented as a hardware-efficient state-preparation prescription.
 
-### P2 — performance should track structural usefulness, not alignment alone
+The new `experiments/run_alignment_control.py` compares these initializations while holding the mixer graph and optimization procedure fixed. No alignment-control result is currently used as evidence for the main hypothesis.
 
-If QUBO-interaction alignment is actually useful for QAOA topology selection, instances or structural regimes with stronger exploitable interaction organization should show larger positive paired improvement.
+## 4. Testable predictions
 
-A high alignment score by itself is not enough. The benchmark must connect that alignment to the measured QAOA outcome.
+A useful mechanism must make predictions beyond “the selected graph has high score.”
 
-### P3 — inverse-score control should remove the proposed advantage
+1. **Structural score separation:** the proposed rule should measurably differ from ring/random controls on the declared structural descriptor. This is a construction sanity check, not evidence of QAOA benefit.
+2. **Outcome association:** if the descriptor is useful, its relationship to paired QAOA improvement should persist after initialization is controlled.
+3. **Alignment robustness:** a topology effect that disappears or reverses when initialization is matched/aligned should not be attributed to topology alone.
+4. **Negative controls:** weak/inverse and shuffled descriptors should remove the claimed correspondence if that correspondence is causal.
+5. **Mechanistic specificity:** any surviving advantage should be related to a concrete transition-graph or mixer-spectral property, not merely to generic graph density or degree.
 
-Construct a deliberately opposite topology by using the weakest |Qij| interactions first, while keeping the same connectivity requirement and edge budget.
+## 5. What the independent benchmark established
 
-If strong interactions are genuinely useful side information, the strong-score topology should outperform this inverse-score control on the regimes where the hypothesis is supposed to apply.
+The first independent weighted densest-k-subgraph benchmark did not reproduce the pilot's positive effect. With the uniform feasible initialization, the strong-`|Q_ij|` topology lost to the ring on 17/24 instances and had a higher median normalized gap than both the ring and random-mean comparators.
 
-If the inverse topology does as well or better, the current score is not supported as a useful mechanism.
+The selected topology nevertheless had very high interaction-weight alignment. Thus high alignment with the QUBO interaction graph was **not sufficient** for better depth-one QAOA performance on that family.
 
-### P4 — shuffled-score control should collapse toward random
+This weakens the original strong-`|Q_ij|` hypothesis. It does not show that all instance-conditioned mixer design is ineffective.
 
-A future controlled experiment should randomly permute the interaction scores before topology construction. This preserves the distribution of scores and the same deterministic construction procedure while destroying correspondence between scores and variable pairs.
+## 6. Current falsification boundary
 
-If the pairwise correspondence is causal, performance should move toward the structure-agnostic random comparator.
+The current strong-`|Q_ij|` rule should not be promoted to a general method unless it survives:
 
-## 4. What would falsify the mechanism
+- independent problem families;
+- initialization/alignment controls;
+- matched optimization and circuit-resource accounting;
+- weak/inverse/shuffled controls;
+- and a mechanistic analysis that identifies what transition-graph property is responsible.
 
-The mechanism should be regarded as unsupported if:
+If those tests fail, the project should treat the strong-`|Q_ij|` mapping as a failed candidate and move to a different structural descriptor rather than tuning the same rule until it succeeds.
 
-1. strong-|Qij| topology has no reproducible outcome benefit across independent structured families;
-2. inverse-score or shuffled-score controls perform comparably or better;
-3. any apparent advantage disappears after matching optimization budget or circuit resources;
-4. performance correlates only with generic graph properties such as degree distribution, not with correspondence to the QUBO interaction structure.
+## 7. Next scientific experiment
 
-A failure is not a failure of “quantum optimization.” It is a failure of this particular structure-to-mixer map.
+The next experiment is deliberately small and mechanistic, not another large benchmark. Compare a predeclared set of structural signals under the same mixer edge budget and both initialization controls:
 
-## 5. First independent test
-
-The first independent benchmark intentionally changes the problem family from the original block-correlated portfolio proxy to weighted densest-k-subgraph.
-
-Settings:
-
-- 24 fresh instances;
-- n = 9;
-- k = 4;
-- edge density = 0.55;
-- planted-community strength = 1.8;
-- QAOA depth p = 1;
-- mixer edge budget = 9;
-- exact fixed-weight simulation;
-- same deterministic p=1 optimizer for every mixer;
-- 8 independent random connected mixer graphs per instance;
-- an inverse-|Qij| topology as a mechanism control;
-- seeds are outside the pilot seed namespace;
-- benchmark is exploratory, not frozen or confirmatory.
-
-The primary comparison remains normalized feasible-range expectation gap, with lower better.
-
-## 6. Result
-
-The strong-|Qij| rule did **not** reproduce the pilot effect.
-
-| Comparison | Median paired improvement favoring structure | Wins / ties / losses |
-| --- | ---: | ---: |
-| Structure vs fixed ring | -0.011456 | 7 / 0 / 17 |
-| Structure vs mean of 8 random mixers | -0.007976 | 10 / 0 / 14 |
-| Structure vs inverse-|Qij| control | +0.013549 | 15 / 0 / 9 |
-
-The 95% bootstrap interval for structure vs ring was [-0.017384, -0.000430]. For structure vs random mean it was [-0.015608, 0.003493]. These are exploratory intervals only.
-
-The median normalized gaps were:
-
-- ring: 0.476476
-- structure: 0.488890
-- random mean: 0.485262
-- inverse structure: 0.472628
-
-The strong-|Qij| mixer had very high interaction-weight alignment by construction (median top-budget alignment 0.9855), while ring was 0.4097 and the inverse control was 0.0 in almost all instances.
-
-This is a useful negative result: **high alignment with the QUBO interaction graph did not translate into better p=1 optimization on this independent family.**
-
-The inverse-vs-structure Wilcoxon comparison gives p = 0.0212, but the corresponding sign-test p-value is 0.154. That disagreement means the inverse result should be treated as a diagnostic signal, not as a confirmatory claim.
-
-## 7. Current scientific interpretation
-
-The independent result weakens the broad hypothesis that “use strong |Qij| interactions as sparse XY edges” is a generally useful topology rule.
-
-It does not establish that QUBO structure is irrelevant to mixer design.
-
-The more interesting question is now:
-
-> Which structural information, if any, should determine the **transition graph** of a fixed-weight mixer?
-
-The current |Qij| score may be measuring an objective interaction graph while the relevant quantity for shallow XY dynamics may instead involve:
-
-- node-conditioned interaction profiles;
-- exchange-cost similarity;
-- pairwise differences in interaction neighborhoods;
-- community-level structure;
-- spectral structure;
-- multi-edge patterns rather than individual coefficients.
-
-Those are candidate mechanisms, not results.
-
-## 8. Next experiment before any blind benchmark
-
-Do not freeze the existing benchmark around the current strong-|Qij| rule yet.
-
-The next scientific experiment should compare a small, predeclared family of mechanistic scores:
-
-1. strong |Qij|;
-2. weak |Qij|;
-3. exchange-profile similarity, based only on pre-optimization Q and c;
+1. strong `|Q_ij|`;
+2. weak `|Q_ij|`;
+3. interaction-profile similarity between variables;
 4. shuffled-score control;
 5. random connected topology.
 
-The experiment should ask which structural signal, if any, changes the mixer transition graph in a way that predicts QAOA improvement.
+The objective is to determine whether any pre-optimization structural signal predicts a useful transition graph **after the initialization confound is exposed**.
 
-Only after that score-selection question is settled should a larger multi-family blind benchmark be frozen.
+Only after that question is answered should a larger confirmatory cross-family benchmark be frozen.
