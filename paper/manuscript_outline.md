@@ -16,7 +16,7 @@ We investigate a verified architecture-search framework that conditions sparse X
 2. **Method:** a typed graph grammar guarantees Hamming-weight preservation and connectivity; a structure-conditioned policy proposes sparse mixers under an explicit edge/depth budget.
 3. **Evaluation:** blind paired benchmarks across portfolio-like and graph problems; equal search, shot and transpilation budgets; exact and noisy simulation plus small-device validation.
 4. **Result:** report whatever effect, including null or negative results, survives the locked analysis.
-5. **Meaning:** identify when QUBO structure predicts useful quantum mixing topology and when it does not.
+5. **Meaning:** assess whether QUBO structure predicts useful quantum mixing topology, and characterize regimes where it does not.
 
 ## Figures required for a submission
 
