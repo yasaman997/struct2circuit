@@ -1,10 +1,10 @@
 # Research protocol: verified structure-conditioned mixers
 
-## Single central claim
+## Central hypothesis
 
-> A structure-conditioned, feasibility-preserving mixer improves the solution-quality/resource Pareto frontier over fixed mixers for cardinality-constrained QUBOs.
+> A structure-conditioned, feasibility-preserving mixer may improve the solution-quality/resource Pareto frontier over fixed mixers for cardinality-constrained QUBOs.
 
-This is deliberately narrower than “AI discovers quantum algorithms.” It can be falsified with paired experiments, has a formal invariant, and creates a clean path from a transparent heuristic to a learned circuit generator.
+This is deliberately narrower than “AI discovers quantum algorithms.” It is a falsifiable hypothesis with a formal invariant, and it creates a clean path from a transparent heuristic to a possible learned circuit generator. The repository currently contains exploratory evidence and benchmark infrastructure; the broader hypothesis has not yet been established.
 
 ## Scientific object
 
