@@ -1,94 +1,84 @@
 # Struct2Circuit: start here
 
-> This page is a concise orientation guide. For the professor-facing overview and current project status, start with [`README.md`](README.md).
+> **Professor-facing entry point:** start with [README.md](README.md). This page is a compact orientation guide for the repository's current scientific scope and status.
 
-This is the non-technical guide to the project. The repository investigates one
-narrow, falsifiable question:
+## The current question
 
-> Can structure-conditioned, feasibility-preserving mixers improve constrained
-> quantum search over fixed and expected-random equal-resource mixers?
+Struct2Circuit studies one narrow question:
 
-The project concerns cardinality-constrained QUBOs, where exactly `k` of `n`
-binary variables must be selected. Its XY mixers preserve that constraint, and
-its exact simulator works directly in the fixed-Hamming-weight feasible subspace.
-This is a study of circuit design—not a claim of quantum advantage.
+> **At a fixed number of mixer edges, does a transparent QUBO-conditioned, feasibility-preserving mixer improve variational optimization outcomes over structure-agnostic connected mixers on unseen cardinality-constrained QUBOs?**
+
+The current structure signal is exactly the off-diagonal interaction magnitude |Q_ij|. The generator builds a maximum-weight spanning tree under that score and then adds the strongest remaining edges until the requested edge budget is reached.
+
+It does **not** use the linear term, optimal solutions, objective values, solver results, benchmark outcomes, or labels.
+
+This is a study of **constrained circuit design**, not a learned architecture-search system and not a quantum-advantage claim.
 
 ## What is implemented
 
 ### Exploratory pilot
 
-The repository contains a deterministic, noiseless pilot on 24 synthetic
-block-correlated instances with `n=8`, `k=3`, and QAOA depth `p=1`. The fixed
-ring and structure-conditioned mixers each use eight edges. Structure won, tied,
-and lost on 17, 0, and 7 instances, respectively; median normalized gap changed
-from approximately `0.1126` to `0.1017`.
+The deterministic, noiseless pilot uses 24 synthetic block-correlated instances with n=8, k=3, and QAOA depth p=1.
 
-This result is exploratory. It motivates benchmark design and statistical
-calibration but does not establish generalization, scaling, hardware performance,
-or quantum advantage.
+The structure-conditioned and ring mixers each use eight edges. The structure-conditioned mixer wins 17 of 24 instances, with median normalized gap changing from 0.112558 to 0.101715.
+
+A 28-edge complete mixer is shown only as a higher-edge-count reference.
+
+The result is exploratory and family-specific. It does not establish generalization, scaling, hardware performance, trainability, or quantum advantage.
 
 ### Stage 1 foundations
 
 Stage 1 implements and tests:
 
 - an instance-independent random connected mixer with an exact edge budget;
-- three structured problem families plus a weak-structure negative control;
-- a deterministic provisional train/validation/blind/transfer manifest; and
-- procedural guards against accidental blind-record access.
+- additional structured and weak-structure problem generators;
+- deterministic provisional train/validation/blind/transfer manifest tooling;
+- procedural safeguards against accidental blind-record access.
 
-Benchmark v1 remains `DRAFT_UNFROZEN`. Its visible blind metadata are provisional,
-no blind performance has been evaluated, and definitive blind definitions require
-external custody before a future freeze.
+Benchmark v1 remains DRAFT_UNFROZEN. No blind performance has been evaluated.
 
-### Pre-freeze Checkpoint 1
+### Pre-freeze checkpoint
 
-The current checkpoint adds synthetic-only tooling for paired median inference,
-multiplicity control, joint coverage, an independent null diagnostic,
-expected-random estimator uncertainty, and optimizer-failure sensitivity. The
-checked-in 336-cell result uses only eight Monte Carlo repetitions per cell and is
-a reproducibility smoke test—not high-precision calibration or mixer-performance
-evidence.
+The repository also contains synthetic-only tooling for statistical sensitivity and inference plumbing.
 
-No final sample count has been selected. The bootstrap procedure is unapproved,
-the optimizer-failure policy is unfrozen, and the null practical-superiority
-margin remains provisional. A higher-precision calibration requires explicit
-human scientific approval.
+The checked-in smoke result uses eight Monte Carlo repetitions per cell and is **not** sufficient to select a sample size, certify power, or approve a final analysis. It exists to exercise the machinery and expose unresolved decisions.
+
+## What is deliberately not claimed
+
+The repository does not currently claim:
+
+- a learned quantum architecture;
+- a trainability improvement;
+- a hardware advantage;
+- a quantum advantage;
+- superiority over classical optimization;
+- cross-family or cross-size generalization.
+
+These are future evaluation targets.
 
 ## Current decision gate
 
-Stage 2 has not begun. Do not run train/validation mixer comparisons, open the
-blind evaluation, train an AI policy, or freeze Benchmark v1 until the pre-freeze
-statistical decisions have been reviewed and approved.
+The next scientific step is review of the pre-freeze statistical specification and compute budget. Until those decisions are approved, do not freeze Benchmark v1 or run a final blind comparison.
 
 ## Where to look
 
-- `README.md` — technical overview, pilot results, and reproducibility commands.
-- `paper/research_protocol.md` — scientific definitions, integrity rules, and
-  permitted claims.
-- `paper/stage_1_prefreeze_report.md` — provisional benchmark rationale and
-  limitations.
-- `tasks/PREFREEZE_DESIGN.md` — the two-freeze model and checkpoint sequence.
-- `paper/prefreeze_sensitivity_report.md` — smoke-level statistical findings,
-  limitations, and unresolved decisions.
-- `results/prefreeze_sensitivity.json` — deterministic machine-readable smoke
-  output.
-- `src/struct2circuit/` — problem, mixer, simulator, benchmark, and sensitivity
-  implementations.
-- `tests/` — mathematical invariants, benchmark safeguards, and statistical
-  regression tests.
+- README.md — professor-facing overview and current scope.
+- paper/research_protocol.md — scientific definitions, estimands, controls, and decision rules.
+- paper/stage_1_prefreeze_report.md — provisional benchmark rationale and cost.
+- tasks/PREFREEZE_DESIGN.md — freeze sequence and approval gates.
+- paper/prefreeze_sensitivity_report.md — smoke-level statistical diagnostics.
+- src/struct2circuit/ — implementation.
+- tests/ — invariant and integrity tests.
 
 ## Reproduce the verified checks
 
-Install the package and run the complete test suite:
+    python3 -m venv .venv
+    source .venv/bin/activate
+    python3 -m pip install -e .
+    python3 -m unittest discover -s tests -v
 
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python3 -m pip install -e .
-python3 -m unittest discover -s tests -v
-```
+The exploratory pilot can be regenerated with:
 
-The exact command for regenerating the pre-freeze smoke artifact is documented in
-`README.md` and `paper/prefreeze_sensitivity_report.md`. Write regenerated output
-to a temporary path and compare it with the checked-in JSON rather than
-overwriting the reviewed artifact.
+    python3 experiments/run_pilot.py --instances 24 --n 8 --k 3
+
+Treat regenerated pilot output as exploratory unless a future benchmark version explicitly says otherwise.
