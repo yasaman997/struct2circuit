@@ -8,7 +8,7 @@
 
 ## One-sentence contribution
 
-We introduce a verified architecture-search framework that conditions sparse XY-mixer topology on optimization-instance structure and test whether it improves the quality/resource frontier with transfer to unseen instances, sizes and hardware graphs.
+We investigate a verified architecture-search framework that conditions sparse XY-mixer topology on optimization-instance structure and test whether it can improve the quality/resource frontier with transfer to unseen instances, sizes and hardware graphs.
 
 ## Abstract skeleton
 
