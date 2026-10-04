@@ -1,251 +1,155 @@
 # Struct2Circuit
 
-> **Start here:** This README is the project overview. It states exactly what is implemented, what the pilot shows, what is not yet tested, and what the next scientific decision is. The project deliberately separates the **current study** from later research extensions.
+**Project overview:** Struct2Circuit studies whether information in a cardinality-constrained QUBO can be used as side information when choosing a sparse, feasibility-preserving XY mixer topology under a fixed edge budget.
 
-## Current study
+## Current research question
 
-**Struct2Circuit** is an ongoing computational study of whether information already present in a cardinality-constrained QUBO can be used to construct a **sparse, feasibility-preserving XY mixer** that is useful under a matched **edge budget**.
+> **Can a transparent pre-optimization instance descriptor select a sparse constrained mixer topology that improves shallow variational optimization over structure-agnostic connected topologies, and under what conditions does that relationship fail?**
 
-The current, falsifiable question is:
+The first descriptor tested is the magnitude of the off-diagonal QUBO interactions, `|Q_ij|`. It is a candidate heuristic, not a theoretically privileged quantity and not a validated algorithm.
 
-> **At a fixed number of mixer edges, does a transparent QUBO-conditioned mixer produce better variational optimization outcomes than structure-agnostic connected mixers on unseen cardinality-constrained QUBOs?**
+For a cardinality-constrained QUBO:
 
-The current method is deliberately narrow. It is **not** a learned policy, a general quantum architecture-search framework, or a claim of quantum advantage.
+**Minimize:** `C_Q(x)`  
+**Subject to:** `Σᵢ xᵢ = k`
 
-### What “structure-conditioned” means here
+with `x ∈ {0, 1}ⁿ`. The mixer uses XY exchanges, so the simulation remains exactly inside the fixed-weight feasible subspace.
 
-For a QUBO matrix Q, the current generator uses only the off-diagonal interaction magnitudes |Q_ij|. It:
+## What has been learned
 
-1. ranks candidate interactions by |Q_ij|;
-2. builds a maximum-weight spanning tree under those scores to guarantee connectivity;
-3. adds the strongest remaining interactions until the edge budget is reached.
+### 1. Exploratory pilot
 
-The linear term c, optimal solution, objective value, solver output, labels, and benchmark results are not supplied to the mixer constructor. The rule is deterministic given Q and the requested edge budget. Because only relative interaction magnitudes are used, multiplying all off-diagonal Q entries by a common positive factor does not change the selected topology; signs are deliberately ignored in this first study.
+The original pilot used 24 synthetic block-correlated QUBOs with `n=8`, `k=3`, `p=1`, and an eight-edge structure-conditioned mixer versus an eight-edge ring mixer.
 
-This makes the scientific intervention explicit: **use pairwise objective structure as side information for constrained circuit topology.**
+The structure-conditioned rule won 17/24 instances and reduced the median normalized gap from `0.112558` to `0.101715`.
 
-## Problem and feasibility
+This was a useful hypothesis-generating result, but it was one synthetic family and did not establish generalization.
 
-We study:
+### 2. First independent test
 
-**Minimize:** C_Q(x)
+A fresh weighted densest-k-subgraph family was then evaluated with 24 instances, `n=9`, `k=4`, `p=1`, a nine-edge budget, eight random connected mixer replicates per instance, and an inverse-`|Q_ij|` control.
 
-**Subject to:** Σᵢ xᵢ = k
+The original strong-`|Q_ij|` rule did **not** reproduce the pilot effect:
 
-with x ∈ {0, 1}ⁿ.
+| Mixer | Median normalized gap |
+| --- | ---: |
+| Inverse-`|Q_ij|` control | **0.472628** |
+| Ring | **0.476476** |
+| Random connected mean | **0.485262** |
+| Strong-`|Q_ij|` structure | **0.488890** |
 
-The constraint fixes Hamming weight to k. The mixer is therefore constructed from XY exchanges, which preserve the fixed-weight feasible subspace.
+The structure rule lost to the ring on 17/24 instances. Its interaction-weight alignment was nevertheless very high, showing that high correspondence with the QUBO interaction graph was not sufficient for better depth-one QAOA performance on this family.
 
-The exact simulator represents only the feasible basis. This is a computational convenience and an exact noiseless invariant—not a claim that a hardware implementation would have zero leakage.
+This is treated as a **negative generalization result**, not as something to tune away.
 
-The current study follows:
+See [results/independent_dks_benchmark_v1.md](results/independent_dks_benchmark_v1.md) for the full exploratory analysis.
 
-**QUBO structure**  
-↓  
-**feasible mixer topology**  
-↓  
-**variational circuit**  
-↓  
-**classical parameter optimization**  
-↓  
-**solution quality**
+## The important experimental correction
 
-## What has actually been tested
+The original comparisons used the same uniform feasible initial state for every mixer. That is a clean fixed-initialization comparison, but it does not isolate topology from mixer/initial-state alignment.
 
-### Exploratory pilot
+Recent constrained-QAOA work makes this a scientifically relevant control. The simulator now supports:
 
-The initial pilot contains **24 synthetic block-correlated QUBO instances** with:
+- `uniform`: uniform superposition over feasible weight-`k` states;
+- `mixer_ground`: normalized projection of that uniform state onto the mixer Hamiltonian's ground-state eigenspace.
 
-- n = 8;
-- k = 3;
-- QAOA depth p = 1;
-- 8-edge structure-conditioned mixer;
-- 8-edge fixed-ring mixer;
-- 28-edge complete mixer as a **higher-edge-count reference**, not a matched-resource baseline.
+The second mode is a small-system diagnostic/control, not a hardware state-preparation claim.
 
-The paired exploratory result is:
+`experiments/run_alignment_control.py` compares the two initializations while keeping the mixer and optimization procedure fixed. **No alignment-control result has yet been folded into the main claim.**
 
-| Metric | Structure-conditioned | Fixed ring |
-|---|---:|---:|
-| Wins / ties / losses | **17 / 0 / 7** | — |
-| Median normalized gap | **0.101715** | **0.112558** |
+The next scientific step is to determine whether any apparent topology effect survives this control.
 
-The one-sided paired Wilcoxon result is p = 0.001752. This is reported descriptively for the exploratory pilot; it is **not** a confirmatory significance claim and is not a basis for claiming generalization.
+## Mechanism hypothesis
 
-The complete 28-edge reference has median normalized gap 0.096086. It uses a substantially larger edge budget and therefore should not be interpreted as evidence for or against the 8-edge comparison.
+The first local intuition—“large `|Q_ij|` makes the corresponding exchange favorable”—is not correct. For a single feasible exchange, the direct `Q_ij x_i x_j` contribution cancels.
 
-### What the pilot does not establish
+The remaining hypothesis is graph-level:
 
-It does not establish:
+`instance descriptor → mixer topology → feasible-state transition graph → variational dynamics → optimization outcome`
 
-- quantum advantage;
-- superiority over strong classical optimization;
-- scalability;
-- hardware-level performance;
-- noise robustness;
-- transfer across problem families, sizes, or hardware graphs;
-- universal usefulness of structure-conditioned mixers;
-- a causal explanation in terms of trainability, gradients, local minima, or loss landscapes.
+The missing link is the transition-graph mechanism. The project therefore treats `|Q_ij|` as a falsifiable candidate descriptor rather than as the answer.
 
-Those are **future questions**, not current results.
+See [docs/MECHANISM_HYPOTHESIS.md](docs/MECHANISM_HYPOTHESIS.md).
 
-## Primary scientific target
+## Literature position
 
-The next stage is to test whether the observed effect, if real, is tied to identifiable instance structure rather than one synthetic family or one hand-chosen topology.
+The project sits at the intersection of constrained QAOA, XY-mixer topology, instance-informed circuit design, and problem-structure/algorithm interaction.
 
-The primary current target is therefore:
+It does **not** claim novelty for constrained mixers, custom mixers, architecture search, adaptive mixer allocation, or trainability theory. The narrow empirical question is whether a transparent pre-optimization instance descriptor can select a sparse XY topology under a matched construction budget.
 
-> **Estimate the family-level paired effect of the transparent structure-conditioned mixer versus predeclared structure-agnostic connected baselines, under an explicitly matched construction budget, and test whether that relationship survives independent problem families and unseen instances.**
+See [docs/LITERATURE_DIFFERENTIATION.md](docs/LITERATURE_DIFFERENTIATION.md).
 
-The current primary outcome is normalized feasible-range optimality-gap improvement. Secondary outcomes include optimum-sampling probability and, later, measured circuit cost.
-
-“Better” must therefore be defined by the predeclared outcome for each claim; the project will not switch to whichever metric favors the proposed method after seeing results.
-
-## Fair comparison: edge budget versus quantum resources
-
-The pilot matches **mixer edge count**, not total quantum resources.
-
-An equal number of graph edges is a construction-level control. It does **not** imply equal two-qubit gate count, circuit depth, routing overhead, or hardware execution cost.
-
-For this reason:
-
-- **pilot:** equal-edge comparison;
-- **planned resource study:** transpiled two-qubit gates, depth, routing/SWAP count, shots, and classical search cost;
-- **resource Pareto claim:** only after those quantities are actually measured.
-
-The complete mixer is a higher-edge-count reference and is not a matched baseline.
-
-## Controls and generalization
-
-The planned benchmark separates:
-
-- fixed ring;
-- random connected graphs at the same edge budget;
-- transparent structure-conditioned graphs;
-- multiple independent problem families;
-- a weak-structure negative control.
-
-The random baseline is an **expected-random comparator** estimated from multiple independent random graphs, not a single lucky draw.
-
-The negative control tests whether the proposed rule can create an apparent advantage when the generator removes obvious planted structure. It cannot prove that no exploitable information exists.
-
-Generalization is reported by dimension:
-
-- **instance transfer:** unseen instances from the same distribution;
-- **family transfer:** unseen problem family;
-- **scale/cardinality transfer:** unseen n or k/n;
-- **hardware transfer:** unseen hardware connectivity.
-
-These are separate claims and will not be collapsed into a generic “transfer” label.
-
-## Trainability is a future mechanistic question
-
-The current pilot does not measure trainability.
-
-If a later study shows a performance difference, a separate mechanistic analysis may test:
-
-- optimization trajectories;
-- gradient statistics;
-- parameter sensitivity;
-- local minima or traps;
-- concentration/landscape diagnostics;
-- robustness to initialization and optimizer choice.
-
-Only evidence from those measurements will support a trainability explanation.
-
-## Learning is a future extension
-
-The present mixer is a transparent deterministic heuristic, not an AI system.
-
-A later study may replace the fixed |Q_ij| score with a **learned mixer-selection policy**. Any such model would use only features available before solving the target instance and would be evaluated with explicit leakage controls. It would not be described as “AI discovering quantum algorithms” unless the evidence justified that much stronger claim.
-
-Possible future models include interpretable edge scorers or graph-based predictors. The model class is intentionally not fixed before the scientific question and feature interface are settled.
-
-## Experimental philosophy
-
-The repository emphasizes:
-
-- exact fixed-weight feasibility in noiseless simulation;
-- explicit definitions of what information reaches the mixer;
-- matched edge budgets as the pilot control;
-- independent random baselines;
-- paired instance-level analysis;
-- train/validation/test separation for future learning;
-- blind evaluation only after a design and pipeline freeze;
-- explicit treatment of optimizer failures;
-- resource accounting rather than edge count alone;
-- reproducible seeds, manifests, and checks;
-- separation of exploratory observations from confirmatory claims.
-
-## Current status
-
-**Exploratory pilot completed; benchmark design and pre-freeze infrastructure in development.**
+## Implementation
 
 Implemented:
 
 - cardinality-constrained QUBO definitions and generators;
-- fixed-weight feasible-subspace simulation;
-- fixed, random-connected, and transparent structure-conditioned mixers;
-- deterministic pilot optimization;
-- paired pilot statistics;
-- provisional benchmark manifests and blind-access guards;
-- synthetic statistical sensitivity tooling;
-- automated tests for mathematical invariants and benchmark integrity.
+- exact fixed-weight feasible-subspace simulation;
+- fixed, random-connected, and structure-conditioned mixer graphs;
+- explicit uniform and mixer-aligned initialization controls;
+- deterministic p=1 parameter optimization;
+- paired exploratory analysis;
+- reproducible independent benchmark scripts;
+- invariant and mechanism tests;
+- benchmark manifests and integrity safeguards.
 
-Not completed:
+## Current status
 
-- confirmatory blind evaluation;
-- learned mixer policy;
-- trainability/landscape study;
-- hardware/transpilation study;
-- strong classical benchmark study;
-- claims of generalization or quantum advantage.
+**Exploratory research; mechanism-control stage.**
 
-The benchmark remains DRAFT_UNFROZEN. Blind performance has not been evaluated.
+The strong-`|Q_ij|` rule has failed to generalize to the first independent family. The next experiment is therefore **not** another large confirmatory benchmark.
+
+The immediate study compares a small, predeclared set of structural descriptors—strong/weak `|Q_ij|`, interaction-profile similarity, shuffled controls, and random topology—under explicit initialization controls.
+
+The statistical sensitivity and pre-freeze machinery already in the repository is retained for reproducibility and later use. It is not the current scientific bottleneck, and no final sample-size or confirmatory-analysis claim is being made from the existing smoke runs.
 
 ## Reproducibility
 
-    python3 -m venv .venv
-    source .venv/bin/activate
-    python3 -m pip install -e .
-    python3 -m unittest discover -s tests -v
-    python3 experiments/run_pilot.py --instances 24 --n 8 --k 3
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python3 -m pip install -e .
+python3 -m unittest discover -s tests -v
+```
 
-Generated pilot outputs should be treated as reproducible exploratory artifacts, not frozen benchmark results.
+Exploratory pilot:
+
+```bash
+python3 experiments/run_pilot.py --instances 24 --n 8 --k 3
+```
+
+Alignment control:
+
+```bash
+python3 experiments/run_alignment_control.py --instances 24 --n 9 --k 4
+```
+
+The alignment-control command generates new exploratory records; it does not modify or overwrite the existing independent benchmark results.
 
 ## Repository map
 
-    src/struct2circuit/
-        problems.py       Cardinality-QUBO definitions and generators
-        mixers.py         Fixed, random, and structure-conditioned mixer graphs
-        simulator.py      Exact feasible-subspace QAOA simulation
-        optimize.py       Deterministic parameter optimization
-        analysis.py       Pilot statistics and reporting
-        benchmark.py      Provisional manifest construction and blind guards
-        sensitivity.py    Synthetic statistical sensitivity analysis
-    experiments/
-        run_pilot.py      Reproducible exploratory pilot entry point
-    tools/
-        benchmark_manifest.py
-    tests/
-    paper/
-    tasks/
-    results/
+```text
+src/struct2circuit/
+    problems.py       Cardinality-QUBO definitions and generators
+    mixers.py         Fixed, random, and structure-conditioned mixer graphs
+    simulator.py      Exact feasible-subspace QAOA + initialization controls
+    optimize.py       Deterministic parameter optimization
+    analysis.py       Exploratory statistics and reporting
+    benchmark.py      Benchmark manifest construction and blind guards
+    sensitivity.py    Statistical sensitivity tooling
+experiments/
+    run_pilot.py
+    run_independent_dks_benchmark.py
+    run_alignment_control.py
+results/
+docs/
+paper/
+tasks/
+tests/
+```
 
-## Research protocol
+## Research principle
 
-The full protocol defines the current estimand, structure signal, controls, resource accounting, generalization dimensions, statistical analysis, and decision gates.
+The repository distinguishes an interesting observation from a validated method.
 
-See [paper/research_protocol.md](paper/research_protocol.md).
-
-## Research direction beyond the current study
-
-The longer-term program is:
-
-**problem structure → constrained circuit design → measured optimization behavior → interpretable prediction → generalization**
-
-A learned policy, trainability analysis, architecture selection, hardware evaluation, and broader problem families are possible extensions. They are not being presented as completed contributions.
-
-The core scientific idea remains deliberately simple:
-
-> **Can structure in an optimization problem be used as side information to design a constrained variational circuit more effectively, and under what conditions does that stop working?**
+> **The goal is not to prove that structure-conditioned mixers work. The goal is to determine whether problem structure contains useful information for constrained circuit design, identify the mechanism if it does, and record clearly where a proposed mapping fails.**
