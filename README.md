@@ -1,84 +1,213 @@
 # Struct2Circuit
 
-**Reproducible exploratory study of structure-conditioned mixers for cardinality-constrained quantum optimization.**
+### Can problem structure inform the design of variational quantum algorithms?
 
-This project studies whether exploitable combinatorial structure can inform
-feasibility-preserving circuit design and improve constrained quantum search
-relative to equal-resource fixed and expected-random mixer baselines.
+**Struct2Circuit** is an ongoing computational research project investigating whether exploitable structure in optimization problems can be translated into better **feasibility-preserving quantum circuit design**.
 
-The paper-level claim under investigation is:
+The project begins with cardinality-constrained QUBOs and asks:
 
-> A structure-conditioned, feasibility-preserving mixer can improve the
-> solution-quality/resource Pareto frontier over fixed and expected-random
-> equal-budget mixers for cardinality-constrained QUBOs.
+> **Under a fixed quantum-resource budget, can information about the optimization instance be used to construct a more effective variational quantum architecture than a structure-agnostic baseline?**
 
-The current release is deliberately narrow. It provides an exact feasible-subspace simulator and a deterministic pilot experiment comparing:
+The longer-term question is:
 
-- a fixed ring XY mixer;
-- a structure-conditioned XY mixer built from the strongest entries of the QUBO matrix while preserving graph connectivity; and
-- a complete XY mixer as a higher-resource reference.
+> **Which properties of an optimization problem determine when a particular quantum architecture is useful or trainable?**
 
-The initial application is a block-correlated selection model motivated by cardinality-constrained bond index tracking. The code is independent of Qiskit and operates directly in the Hamming-weight-`k` subspace, whose dimension is `binomial(n, k)` rather than `2**n`.
+---
 
-## Current exploratory pilot
+## Research idea
 
-The repository already contains the first deterministic run: 24 instances with `n=8`, `k=3` and `p=1`. The structure-conditioned mixer and fixed ring both used eight mixer edges per layer.
+A variational quantum algorithm does not operate independently of the problem it is solving. The problem Hamiltonian, feasible subspace, mixer structure, and classical optimization interact.
 
-- Structure won / tied / lost against ring on **17 / 0 / 7** paired instances.
-- Median normalized gap decreased from **0.112558** to **0.101715**.
-- Paired median gap reduction was **0.014678**.
-- Exploratory bootstrap 95% interval: **[0.001460, 0.016576]**.
-- One-sided paired Wilcoxon `p = 0.001752`.
-- The 28-edge complete mixer reached a median gap of **0.096086**.
+Struct2Circuit studies this interaction by comparing **problem-informed** and **structure-agnostic** feasible mixers.
 
-The pilot motivates proceeding to pre-freeze benchmark design and statistical
-calibration. It does **not** establish generalization, hardware performance,
-scaling or quantum advantage.
+For cardinality-constrained QUBOs,
 
-## Scientific status
+\[
+\min_x C_Q(x)
+\qquad
+\text{subject to}
+\qquad
+\sum_i x_i=k,
+\]
 
-This is a **pilot and research scaffold**, not evidence of quantum advantage. A positive pilot result only justifies advancing to deeper circuits, broader instance families, stronger classical/quantum baselines, noise models, blind splits, and hardware-aware resource accounting. The preregistered claim ladder is defined in `paper/research_protocol.md`.
+the mixer must preserve the feasible Hamming-weight-`k` subspace.
 
-Stage 1 benchmark foundations are implemented. The candidate benchmark remains
-`DRAFT_UNFROZEN` pending scientific approval; blind records are excluded by
-default and no blind performance has been run. See
-`paper/stage_1_prefreeze_report.md` for the proposed counts and decision gate.
+The current study therefore follows:
 
-Checkpoint 1 of the subsequent pre-freeze design process provides synthetic-only
-statistical sensitivity tooling. The checked-in analysis is an eight-repetition
-smoke artifact, not high-precision calibration; it does not generate QUBOs or
-select benchmark counts. Reproduce it without overwriting the checked-in result:
+**QUBO structure**  
+↓  
+**feasible mixer topology**  
+↓  
+**variational quantum circuit**  
+↓  
+**classical parameter optimization**  
+↓  
+**solution quality**
 
-```bash
-python3 tools/prefreeze_sensitivity.py \
-  --output /tmp/prefreeze_sensitivity_smoke.json \
-  --seed 20260903 \
-  --runtime-cap 180 \
-  --min-repetitions 8 \
-  --max-repetitions 8 \
-  --bootstrap-samples 199 \
-  --target-mcse 0.20 \
-  --random-baseline-sd 0.003
-cmp /tmp/prefreeze_sensitivity_smoke.json results/prefreeze_sensitivity.json
-```
+The central hypothesis is that **problem structure may contain information that can be exploited when designing the circuit itself**, rather than only when constructing the objective Hamiltonian.
 
-See `tasks/PREFREEZE_DESIGN.md` and `paper/prefreeze_sensitivity_report.md` before
-interpreting the machine-readable output. Bootstrap approval, the optimizer-
-failure policy, the null practical-superiority margin, and final sample counts
-all remain open decisions for human scientific review. Stage 2 and blind
-evaluation have not begun.
+---
 
-Generate or inspect the provisional manifest without exposing blind records:
+# Exploratory pilot
 
-```bash
-python3 tools/benchmark_manifest.py generate \
-  --config configs/benchmark_v1_draft.json \
-  --output manifests/benchmark_v1_draft.json
-python3 tools/benchmark_manifest.py inspect \
-  --manifest manifests/benchmark_v1_draft.json
-```
+### Matched-resource comparison
 
-## Quick start
+The initial pilot uses **24 synthetic cardinality-constrained QUBO instances** with:
+
+- `n = 8` variables;
+- `k = 3`;
+- QAOA depth `p = 1`;
+- an **8-edge structure-conditioned mixer**;
+- an **8-edge fixed-ring mixer** as the primary matched-resource baseline;
+- a **28-edge complete mixer** as a higher-resource reference.
+
+### Preliminary result
+
+| Metric | Structure-conditioned | Fixed ring |
+|---|---:|---:|
+| Instances won | **17 / 24** | 7 / 24 |
+| Median normalized gap | **0.101715** | 0.112558 |
+
+The paired pilot comparison gives an exploratory Wilcoxon signed-rank **p = 0.001752**.
+
+The complete 28-edge mixer reached a median normalized gap of **0.096086** and serves as a higher-resource reference.
+
+### What the pilot does *not* establish
+
+This experiment does **not** establish:
+
+- quantum advantage;
+- hardware-level performance;
+- scalability;
+- superiority over strong classical optimization methods;
+- generalization beyond the tested instance family;
+- that structure-conditioned mixers are universally preferable.
+
+The pilot is exploratory: its purpose is to test whether the proposed experimental question is sufficiently promising to justify a more rigorous controlled study.
+
+---
+
+# The research question I'm pursuing
+
+The most interesting question is not simply whether one mixer can outperform another.
+
+It is whether **performance varies systematically with properties of the underlying optimization instance**.
+
+This leads to the next research question:
+
+> **What structural properties of an optimization instance explain when a problem-informed variational architecture helps?**
+
+Candidate features include:
+
+- interaction-graph density;
+- degree and community structure;
+- coefficient variation;
+- constraint tightness;
+- degeneracy;
+- spectral characteristics;
+- other measures of combinatorial structure and instance difficulty.
+
+The goal is to move from:
+
+**“Which circuit wins?”**
+
+toward:
+
+**“Can we understand and predict which circuit should work for a given problem?”**
+
+---
+
+# From benchmarking to explanation
+
+The planned research direction is:
+
+### 1. Problem structure
+Identify measurable structural features of optimization instances.
+
+↓
+
+### 2. Circuit structure
+Determine how those features can inform feasible mixer construction.
+
+↓
+
+### 3. Optimization behavior
+Study whether architectural differences are associated with differences in convergence, parameter sensitivity, gradients, or optimization traps.
+
+↓
+
+### 4. Prediction
+Test whether classical statistical or machine-learning models can predict which architecture is likely to perform best from the instance structure.
+
+↓
+
+### 5. Generalization
+Test whether the resulting relationships persist across new instances, problem sizes, constraints, and circuit/resource regimes.
+
+The aim is **not** to use machine learning merely as another benchmark. The goal is to ask whether learning can reveal interpretable relationships between **problem structure and quantum-algorithm behavior**.
+
+---
+
+# Experimental philosophy
+
+The project emphasizes controlled and reproducible computational experiments.
+
+The methodology includes:
+
+- matched mixer-resource budgets;
+- exact feasible-subspace simulation;
+- deterministic and seeded experiments;
+- explicit feasibility and Hermiticity validation;
+- paired statistical comparisons;
+- blind evaluation for confirmatory experiments;
+- null controls;
+- sensitivity analysis;
+- explicit resource accounting;
+- separation of exploratory and confirmatory results.
+
+A promising pilot is treated as a **hypothesis to investigate**, rather than as evidence for a broad quantum-advantage claim.
+
+---
+
+# Current status
+
+**Exploratory pilot completed; confirmatory benchmark in development.**
+
+The current research codebase includes:
+
+- cardinality-constrained QUBO generation;
+- feasible-subspace simulation;
+- fixed and structure-conditioned mixer construction;
+- deterministic parameter optimization;
+- paired statistical analysis;
+- reproducible experiment manifests;
+- blind-access safeguards;
+- synthetic sensitivity analysis;
+- automated tests for core invariants and benchmark integrity.
+
+The confirmatory benchmark has **not** been presented as completed. The candidate benchmark remains `DRAFT_UNFROZEN`, and blind evaluation has not begun.
+
+---
+
+# Why this problem?
+
+Cardinality-constrained QUBOs provide a controlled setting in which several questions can be studied together:
+
+- How much problem structure should a circuit exploit?
+- What is the cost of encoding that structure?
+- Does a structure-aware architecture remain competitive at the same resource budget?
+- Which instance properties predict when it helps?
+- Are improvements associated with changes in the optimization behavior of the variational circuit?
+
+This makes the project a bridge between **combinatorial optimization, quantum algorithms, machine learning, and computational studies of variational optimization**.
+
+---
+
+# Reproducibility
+
+The project is designed so that experimental claims can be traced back to explicit configurations and reproducible computations.
+
+Random sources are controlled, generated mixers are validated, simulations remain within the required feasible subspace, and resource usage is explicitly recorded.
 
 ```bash
 python3 -m venv .venv
@@ -88,52 +217,56 @@ python3 -m unittest discover -s tests -v
 python3 experiments/run_pilot.py --instances 24 --n 8 --k 3
 ```
 
-Results are written to `results/`:
+---
 
-- `pilot_results.csv`: per-instance/per-mixer measurements;
-- `pilot_summary.json`: paired statistics and configuration;
-- `pilot_report.md`: automatically generated interpretation;
-- `pilot_quality_resource.png`: quality/resource diagnostic figure.
-
-## Repository map
+# Repository map
 
 ```text
 src/struct2circuit/
-  problems.py       Cardinality-QUBO definitions and generators
-  mixers.py         Fixed and structure-conditioned mixer graphs
-  simulator.py      Exact feasible-subspace QAOA simulation
-  optimize.py       Deterministic parameter optimization
-  analysis.py       Paired statistics and pilot report generation
-  benchmark.py      Provisional manifest construction and blind-access guards
-  sensitivity.py    Synthetic paired-inference sensitivity analysis
+    problems.py       Cardinality-QUBO definitions and generators
+    mixers.py         Fixed and structure-conditioned mixer graphs
+    simulator.py      Exact feasible-subspace QAOA simulation
+    optimize.py       Deterministic parameter optimization
+    analysis.py       Paired statistics and pilot report generation
+    benchmark.py      Provisional manifest construction and blind-access guards
+    sensitivity.py    Synthetic paired-inference sensitivity analysis
 experiments/
-  run_pilot.py      Reproducible pilot entry point
+    run_pilot.py      Reproducible pilot entry point
 tools/
-  benchmark_manifest.py      Generate or inspect the provisional manifest
-  prefreeze_sensitivity.py   Run the bounded synthetic sensitivity grid
+    benchmark_manifest.py
+    prefreeze_sensitivity.py
 tests/
-  test_invariants.py          Feasibility, Hermiticity and determinism tests
-  test_benchmark_manifest.py Benchmark integrity and access-guard tests
-  test_sensitivity.py         Statistical-tooling regression tests
+    test_invariants.py
+    test_benchmark_manifest.py
+    test_sensitivity.py
 tasks/
-  PREFREEZE_DESIGN.md         Checkpoint sequence and statistical specification
+    PREFREEZE_DESIGN.md
 paper/
-  research_protocol.md
-  stage_1_prefreeze_report.md
-  prefreeze_sensitivity_report.md
+    research_protocol.md
+    stage_1_prefreeze_report.md
+    prefreeze_sensitivity_report.md
 results/
-  prefreeze_sensitivity.json  Checked-in eight-repetition smoke artifact
+    prefreeze_sensitivity.json
 ```
 
-## Reproducibility contract
+---
 
-- Every random source is seeded.
-- Every generated mixer is validated as connected.
-- Every simulated state remains in the exact feasible basis.
-- Search evaluations and edge counts are recorded.
-- The structure-conditioned and ring mixers use the same mixer-edge budget.
-- Pilot results are labeled exploratory; confirmatory thresholds are evaluated only on locked blind instances.
+# Research protocol
 
-## Closest literature to beat
+The detailed protocol documents the contribution ladder, instance families, controls, baselines, metrics, statistical analysis, transfer tests, ablations, and success criteria.
 
-The project is positioned against constraint-preserving alternating operators, predictor/training-free quantum architecture search, hardware-aware QAS, and recent rigorous quantum-optimization benchmarking. The manuscript protocol contains the working comparison table and representative references.
+**For the full experimental design, see [`paper/research_protocol.md`](paper/research_protocol.md).**
+
+---
+
+## Current research direction
+
+The project started with a narrow question:
+
+> **Can exploiting optimization-instance structure improve feasible mixer design under a fixed resource budget?**
+
+The next question is more general:
+
+> **Can structural information about a computational problem be used to design, select, or learn quantum circuits that are more effective or resource-efficient—and can the resulting behavior be understood in terms of the structure and complexity of the underlying problem?**
+
+That is the direction I am currently developing.
