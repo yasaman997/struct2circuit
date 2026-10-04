@@ -1,5 +1,7 @@
 # Struct2Circuit
 
+> **Start here:** This README is the primary entry point. It summarizes the research question, completed exploratory work, current status, and how to reproduce the verified checks. Detailed protocol and planning documents are linked below.
+
 ### Can problem structure inform the design of variational quantum algorithms?
 
 **Struct2Circuit** is an ongoing computational research project investigating whether exploitable structure in optimization problems can be translated into better **feasibility-preserving quantum circuit design**.
