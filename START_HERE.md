@@ -1,5 +1,7 @@
 # Struct2Circuit: start here
 
+> This page is a concise orientation guide. For the professor-facing overview and current project status, start with [`README.md`](README.md).
+
 This is the non-technical guide to the project. The repository investigates one
 narrow, falsifiable question:
 
