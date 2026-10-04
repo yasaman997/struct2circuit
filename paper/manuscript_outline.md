@@ -1,5 +1,7 @@
 # Working manuscript outline
 
+> **Status: prospective outline.** This document describes a possible future paper structure and evaluation plan; it does not represent completed results or an accepted contribution. Claims below are conditional on the outcomes of the planned benchmark.
+
 ## Working title
 
 **Struct2Circuit: Verified Structure-Conditioned Mixers for Cardinality-Constrained Quantum Optimization**
