@@ -92,5 +92,20 @@ class InvariantTests(unittest.TestCase):
         self.assertTrue(np.allclose(np.diag(scores), 0.0))
 
 
+    def test_cost_span_scaling_is_invariant_to_positive_cost_rescaling(self) -> None:
+        mixer = ring_mixer(self.problem.n)
+        base = FeasibleSubspaceQAOA(self.problem, mixer)
+        scaled_problem = type(self.problem)(
+            7.0 * self.problem.Q,
+            7.0 * self.problem.c,
+            self.problem.k,
+            name="scaled",
+        )
+        scaled = FeasibleSubspaceQAOA(scaled_problem, mixer)
+        a = optimize_p1(base, grid_size=7, gamma_scale="feasible_span")
+        b = optimize_p1(scaled, grid_size=7, gamma_scale="feasible_span")
+        self.assertAlmostEqual(a.result.normalized_gap, b.result.normalized_gap, places=8)
+
+
 if __name__ == "__main__":
     unittest.main()
