@@ -34,14 +34,15 @@ Different XY topologies can have different mixer ground spaces and different spe
 
 This matters because recent constrained-QAOA work has shown that initial-state/mixer alignment can affect low-depth performance. The literature map therefore treats alignment as a required control rather than a nuisance detail.
 
-The simulator now exposes two explicit initialization modes:
+The simulator now exposes three explicit initialization modes:
 
 - `uniform`: uniform superposition over all feasible weight-`k` states;
-- `mixer_ground`: the normalized projection of the uniform feasible state onto the mixer Hamiltonian's ground-state eigenspace.
+- `mixer_low`: deterministic state in the lowest mixer eigenspace;
+- `mixer_high`: deterministic state in the highest mixer eigenspace.
 
-The second mode is an exact diagnostic/control in the small-system simulator. It is **not** being presented as a hardware-efficient state-preparation prescription.
+Both spectral extrema are exposed because the interpretation of “ground” versus “aligned” depends on the Hamiltonian sign convention. Uniform-state fidelity with each extremal eigenspace is reported separately.
 
-The new `experiments/run_alignment_control.py` compares these initializations while holding the mixer graph and optimization procedure fixed. No alignment-control result is currently used as evidence for the main hypothesis.
+These are exact small-system diagnostics, not hardware-efficient state-preparation prescriptions. Comparing them measures sensitivity to the **topology/initialization pairing**; it does not identify a pure causal topology effect.
 
 ## 4. Testable predictions
 
@@ -73,13 +74,39 @@ The current strong-`|Q_ij|` rule should not be promoted to a general method unle
 
 If those tests fail, the project should treat the strong-`|Q_ij|` mapping as a failed candidate and move to a different structural descriptor rather than tuning the same rule until it succeeds.
 
+## 6A. Concrete transition-level mechanism candidate
+
+The next descriptor is derived from the exact feasible exchange-cost formula,
+rather than generic interaction magnitude. For exchanging occupied i with
+unoccupied j,
+
+`Delta C_ij(x) = (Q_jj-Q_ii) + (c_j-c_i) + 2 sum_(l != i,j) x_l (Q_jl-Q_il)`.
+
+Define the pre-optimization exchange-profile score
+
+`s_ij = sqrt(((Q_jj-Q_ii+c_j-c_i)^2 + 4 sum_(l != i,j)(Q_jl-Q_il)^2)/(n-1))`.
+
+This is the RMS magnitude of the coefficients governing that exchange's cost
+change before conditioning on a particular feasible state. It uses only Q and c,
+does not inspect solutions or QAOA outcomes, and directly reflects the transition
+whose XY edge would enable.
+
+Two opposite hypotheses are deliberately distinguishable:
+
+- low-score edges create locally smoother exchanges and may support shallow mixing;
+- high-score edges create stronger cost discrimination and may be more useful.
+
+Neither direction is privileged before data are inspected. Both must be treated
+as predeclared competing mechanisms rather than tuning the sign after seeing
+performance.
+
 ## 7. Next scientific experiment
 
 The next experiment is deliberately small and mechanistic, not another large benchmark. Compare a predeclared set of structural signals under the same mixer edge budget and both initialization controls:
 
 1. strong `|Q_ij|`;
 2. weak `|Q_ij|`;
-3. interaction-profile similarity between variables;
+3. low/high exchange-profile score defined above;
 4. shuffled-score control;
 5. random connected topology.
 
