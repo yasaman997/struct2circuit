@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Compare uniform and mixer-aligned initialization for the same mixer graphs.
+"""Measure sensitivity to initialization for the same mixer graphs.
 
-This is an experimental control, not a replacement for the independent benchmark.
-Its purpose is to separate topology effects from initialization/mixer alignment.
-No benchmark result is hard-coded or used to select a method.
+This diagnostic does not isolate a pure topology effect: each spectral reference
+is part of a topology+initialization algorithmic configuration. Both mixer
+spectral extrema are reported so the interpretation is explicit under the
+chosen Hamiltonian sign convention.
 """
 
 from __future__ import annotations
@@ -66,7 +67,7 @@ def main() -> None:
             mixers.append((f"random_{replicate:02d}", random_connected_mixer(args.n, args.edge_budget, seed)))
 
         for method, mixer in mixers:
-            for initialization in ("uniform", "mixer_ground"):
+            for initialization in ("uniform", "mixer_low", "mixer_high"):
                 simulator = FeasibleSubspaceQAOA(
                     problem,
                     mixer,
@@ -79,12 +80,14 @@ def main() -> None:
                         "problem_seed": problem_seed,
                         "method": method,
                         "initialization": initialization,
-                        "mixer_ground_fidelity_of_uniform": simulator.uniform_mixer_ground_state_fidelity,
+                        "uniform_low_eigenspace_fidelity": simulator.uniform_mixer_extremal_fidelity("low"),
+                        "uniform_high_eigenspace_fidelity": simulator.uniform_mixer_extremal_fidelity("high"),
                         "normalized_gap": result.result.normalized_gap,
                         "probability_optimum": result.result.probability_optimum,
                         "gamma": result.gamma[0],
                         "beta": result.beta[0],
-                        "optimizer_success": result.optimizer_success,
+                        "finite_objective": result.finite_objective,
+                        "local_refinement_converged": result.local_refinement_converged,
                     }
                 )
 
