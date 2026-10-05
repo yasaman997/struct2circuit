@@ -51,13 +51,12 @@ The original comparisons used the same uniform feasible initial state for every 
 Recent constrained-QAOA work makes this a scientifically relevant control. The simulator now supports:
 
 - `uniform`: uniform superposition over feasible weight-`k` states;
-- `mixer_ground`: normalized projection of that uniform state onto the mixer Hamiltonian's ground-state eigenspace.
+- `mixer_low`: deterministic state in the lowest mixer eigenspace;
+- `mixer_high`: deterministic state in the highest mixer eigenspace.
 
-The second mode is a small-system diagnostic/control, not a hardware state-preparation claim.
+Both spectral extrema are exposed because “ground” versus “aligned” depends on the mixer sign convention. Their overlap with the uniform state is measured separately. These modes diagnose sensitivity to the topology/initialization pairing; they do **not** by themselves isolate a pure topology effect.
 
-`experiments/run_alignment_control.py` compares the two initializations while keeping the mixer and optimization procedure fixed. **No alignment-control result has yet been folded into the main claim.**
-
-The next scientific step is to determine whether any apparent topology effect survives this control.
+`experiments/run_alignment_control.py` implements this diagnostic. **No initialization-diagnostic result has yet been folded into the main claim.**
 
 ## Mechanism hypothesis
 
@@ -67,7 +66,7 @@ The remaining hypothesis is graph-level:
 
 `instance descriptor → mixer topology → feasible-state transition graph → variational dynamics → optimization outcome`
 
-The missing link is the transition-graph mechanism. The project therefore treats `|Q_ij|` as a falsifiable candidate descriptor rather than as the answer.
+The missing link is the transition-graph mechanism. A concrete next candidate is now derived from the exact exchange-cost formula: an RMS score built from `(Q_jj-Q_ii)+(c_j-c_i)` and the row differences `Q_jl-Q_il`. Low-score and high-score versions are predeclared as competing hypotheses rather than choosing a direction after seeing performance.
 
 See [docs/MECHANISM_HYPOTHESIS.md](docs/MECHANISM_HYPOTHESIS.md).
 
@@ -86,8 +85,8 @@ Implemented:
 - cardinality-constrained QUBO definitions and generators;
 - exact fixed-weight feasible-subspace simulation;
 - fixed, random-connected, and structure-conditioned mixer graphs;
-- explicit uniform and mixer-aligned initialization controls;
-- deterministic p=1 parameter optimization;
+- explicit uniform/low-spectrum/high-spectrum initialization diagnostics;
+- deterministic p=1 parameter optimization with feasible-cost-span scaling for new studies and a legacy mode for historical reproduction;
 - paired exploratory analysis;
 - reproducible independent benchmark scripts;
 - invariant and mechanism tests;
@@ -99,7 +98,7 @@ Implemented:
 
 The strong-`|Q_ij|` rule has failed to generalize to the first independent family. The next experiment is therefore **not** another large confirmatory benchmark.
 
-The immediate study compares a small, predeclared set of structural descriptors—strong/weak `|Q_ij|`, interaction-profile similarity, shuffled controls, and random topology—under explicit initialization controls.
+The immediate study compares a small, predeclared set of structural descriptors—strong/weak `|Q_ij|`, low/high exchange-profile scores derived from the exact swap-cost formula, shuffled controls, and random topology—under explicit initialization diagnostics. New mechanism-stage runs use feasible-cost-span scaling for the gamma domain; historical results remain reproducible in legacy mode.
 
 The statistical sensitivity and pre-freeze machinery already in the repository is retained for reproducibility and later use. It is not the current scientific bottleneck, and no final sample-size or confirmatory-analysis claim is being made from the existing smoke runs.
 
