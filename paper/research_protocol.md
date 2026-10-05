@@ -63,6 +63,32 @@ A common positive rescaling of all off-diagonal Q values leaves the topology unc
 
 If a later method uses signs, diagonal terms, c, spectral features, or another structural descriptor, it is a **new method** and must be evaluated separately.
 
+## 3A. Initialization is an experimental factor
+
+Initialization is part of the algorithmic configuration, not a nuisance variable
+that can be silently "controlled away."
+
+The baseline condition uses the uniform feasible superposition. Diagnostic
+conditions use deterministic states from the lowest and highest eigenspaces of
+the mixer Hamiltonian. Both extrema are reported because the interpretation of
+"ground" versus "aligned" depends on the mixer sign convention.
+
+Comparing a topology under different initializations measures sensitivity to the
+topology/initialization pairing. It does **not** identify a pure causal topology
+effect. Uniform-state fidelity with each extremal eigenspace is reported
+separately as an alignment diagnostic.
+
+## 3B. Cost scale and parameter domain
+
+For new mechanism-stage experiments, the cost-phase search is expressed in
+dimensionless units using the feasible cost span
+`C_max - C_min`. Equivalently, the default p=1 search uses
+`gamma_max = 2*pi/(C_max-C_min)` when the span is nonzero.
+
+This removes arbitrary instance-to-instance cost scaling from the fixed gamma
+box. Historical exploratory benchmarks retain a `legacy` mode with the original
+`[0,2*pi]` gamma interval so their published numbers remain reproducible.
+
 ## 4. What is and is not matched
 
 ### Pilot control
