@@ -166,6 +166,75 @@ def structure_conditioned_mixer(Q: FloatArray, edge_budget: int) -> MixerSpec:
     )
 
 
+
+def exchange_profile_scores(Q: FloatArray, c: FloatArray) -> FloatArray:
+    """Pre-optimization edge scores derived from exchange-cost sensitivity.
+
+    For exchanging occupations i->j, the state-dependent part of the exact cost
+    difference depends on row differences Q[j,l]-Q[i,l], while diagonal and
+    linear terms contribute a state-independent offset. The score below measures
+    the RMS magnitude of those coefficients over all other variables together
+    with the offset. It uses only Q and c and does not inspect solutions or QAOA
+    outcomes.
+    """
+    q = np.asarray(Q, dtype=float)
+    linear = np.asarray(c, dtype=float)
+    if q.ndim != 2 or q.shape[0] != q.shape[1]:
+        raise ValueError("Q must be square")
+    n = q.shape[0]
+    if linear.shape != (n,):
+        raise ValueError("c must have one entry per variable")
+    scores = np.zeros((n, n), dtype=float)
+    for i, j in combinations(range(n), 2):
+        others = [ell for ell in range(n) if ell not in (i, j)]
+        coefficients = 2.0 * (q[j, others] - q[i, others])
+        offset = (q[j, j] - q[i, i]) + linear[j] - linear[i]
+        rms = np.sqrt((offset * offset + float(coefficients @ coefficients)) / (len(others) + 1))
+        scores[i, j] = scores[j, i] = float(rms)
+    return scores
+
+
+def score_conditioned_mixer(
+    scores: FloatArray,
+    edge_budget: int,
+    *,
+    prefer: str = "low",
+    name: str = "score_conditioned",
+) -> MixerSpec:
+    """Build a connected sparse mixer from a predeclared symmetric edge score."""
+    s = np.asarray(scores, dtype=float)
+    if s.ndim != 2 or s.shape[0] != s.shape[1]:
+        raise ValueError("scores must be square")
+    if not np.allclose(s, s.T, atol=1e-12):
+        raise ValueError("scores must be symmetric")
+    if prefer not in {"low", "high"}:
+        raise ValueError("prefer must be 'low' or 'high'")
+    n = s.shape[0]
+    maximum = n * (n - 1) // 2
+    if not n - 1 <= edge_budget <= maximum:
+        raise ValueError(f"edge_budget must lie in [{n - 1}, {maximum}]")
+    sign = 1.0 if prefer == "low" else -1.0
+    ranked = sorted(
+        ((sign * float(s[i, j]), i, j) for i, j in combinations(range(n), 2)),
+        key=lambda item: (item[0], item[1], item[2]),
+    )
+    uf = _UnionFind(n)
+    chosen: list[Edge] = []
+    chosen_set: set[Edge] = set()
+    for _, i, j in ranked:
+        if uf.union(i, j):
+            chosen.append((i, j))
+            chosen_set.add((i, j))
+            if len(chosen) == n - 1:
+                break
+    for _, i, j in ranked:
+        if len(chosen) >= edge_budget:
+            break
+        if (i, j) not in chosen_set:
+            chosen.append((i, j))
+            chosen_set.add((i, j))
+    return MixerSpec(name, n, tuple(chosen), f"{prefer}-score spanning tree plus ranked remaining edges")
+
 def xy_mixer_hamiltonian(basis: IntArray, mixer: MixerSpec) -> FloatArray:
     """Construct ``sum_(i,j in E) (X_i X_j + Y_i Y_j)/2`` in a fixed-weight basis."""
     states = np.asarray(basis, dtype=np.int8)
