@@ -73,7 +73,7 @@ def main() -> None:
                     mixer,
                     initialization=initialization,
                 )
-                result = optimize_p1(simulator, grid_size=args.grid_size)
+                result = optimize_p1(simulator, grid_size=args.grid_size, gamma_scale="feasible_span")
                 rows.append(
                     {
                         "instance": instance,
