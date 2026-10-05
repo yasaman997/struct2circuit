@@ -16,11 +16,16 @@ class OptimizationResult:
     beta: tuple[float, ...]
     result: QAOAResult
     objective_evaluations: int
-    optimizer_success: bool
+    finite_objective: bool
     local_refinement_converged: bool
 
 
-def optimize_p1(simulator: FeasibleSubspaceQAOA, grid_size: int = 17) -> OptimizationResult:
+def optimize_p1(
+    simulator: FeasibleSubspaceQAOA,
+    grid_size: int = 17,
+    *,
+    gamma_scale: str = "feasible_span",
+) -> OptimizationResult:
     """Coarse deterministic grid followed by two bounded local refinements.
 
     L-BFGS-B is efficient in smooth interior regions, while Powell is more
@@ -29,7 +34,14 @@ def optimize_p1(simulator: FeasibleSubspaceQAOA, grid_size: int = 17) -> Optimiz
     """
     if grid_size < 5:
         raise ValueError("grid_size must be at least 5")
-    gammas = np.linspace(0.0, 2.0 * np.pi, grid_size, endpoint=False)
+    if gamma_scale not in {"feasible_span", "legacy"}:
+        raise ValueError("gamma_scale must be 'feasible_span' or 'legacy'")
+    span = simulator.cost_max - simulator.cost_min
+    if gamma_scale == "feasible_span" and span > 1e-14:
+        gamma_max = 2.0 * np.pi / span
+    else:
+        gamma_max = 2.0 * np.pi
+    gammas = np.linspace(0.0, gamma_max, grid_size, endpoint=False)
     betas = np.linspace(0.0, np.pi, grid_size, endpoint=False)
     best_value = float("inf")
     best = (0.0, 0.0)
@@ -51,7 +63,7 @@ def optimize_p1(simulator: FeasibleSubspaceQAOA, grid_size: int = 17) -> Optimiz
         objective,
         np.asarray(best),
         method="L-BFGS-B",
-        bounds=[(0.0, 2.0 * np.pi), (0.0, np.pi)],
+        bounds=[(0.0, gamma_max), (0.0, np.pi)],
         options={"maxiter": 120, "ftol": 1e-13, "gtol": 1e-9},
     )
     powell = minimize(
@@ -74,6 +86,6 @@ def optimize_p1(simulator: FeasibleSubspaceQAOA, grid_size: int = 17) -> Optimiz
         beta=(beta,),
         result=result,
         objective_evaluations=evaluations,
-        optimizer_success=bool(np.isfinite(result.expectation)),
+        finite_objective=bool(np.isfinite(result.expectation)),
         local_refinement_converged=bool(refined.success or powell.success),
     )
