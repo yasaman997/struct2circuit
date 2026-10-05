@@ -27,9 +27,10 @@ The original comparison fixed the same uniform feasible initial state for every 
 The simulator now supports two explicit initialization conditions:
 
 - `uniform` — uniform feasible superposition;
-- `mixer_ground` — normalized projection of the uniform feasible state onto the mixer ground-state eigenspace.
+- `mixer_low` — deterministic lowest-eigenspace reference;
+- `mixer_high` — deterministic highest-eigenspace reference.
 
-The alignment control is implemented in:
+Both extrema are kept because the sign convention matters. This is an initialization-sensitivity diagnostic, not a claim that topology has been causally isolated. It is implemented in:
 
 ```text
 experiments/run_alignment_control.py
@@ -61,7 +62,7 @@ The missing link is the transition-graph mechanism. See [docs/MECHANISM_HYPOTHES
 
 Do **not** start another large confirmatory benchmark yet.
 
-The next study compares a small predeclared set of structural descriptors—strong/weak `|Q_ij|`, interaction-profile similarity, shuffled controls, and random topology—under explicit initialization controls.
+The next study compares strong/weak `|Q_ij|` with low/high exchange-profile scores derived directly from the exact feasible swap-cost formula, plus shuffled and random controls. It reports all three initialization conditions and uses cost-span-normalized gamma search for new runs.
 
 The repository already contains statistical sensitivity and pre-freeze infrastructure. Those tools remain available for a later confirmatory study; they are not the current scientific bottleneck.
 
