@@ -159,7 +159,7 @@ def main() -> None:
 
         for method, mixer in mixers:
             simulator = FeasibleSubspaceQAOA(problem, mixer)
-            result = optimize_p1(simulator, grid_size=args.grid_size)
+            result = optimize_p1(simulator, grid_size=args.grid_size, gamma_scale="legacy")
             rows.append(
                 {
                     "instance": instance,
