@@ -6,7 +6,7 @@
 
 > **At a fixed number of mixer edges, does a transparent QUBO-conditioned, feasibility-preserving XY mixer improve variational optimization outcomes over structure-agnostic connected mixers on unseen cardinality-constrained QUBOs?**
 
-The present method is **not** a learned policy. It is a deterministic structure-conditioned rule based only on off-diagonal interaction magnitudes `|Q_ij|`.
+The historical pilot used a deterministic rule based on off-diagonal `|Q_ij|`, not a learned policy. That heuristic failed to generalize in the first independent weighted DKS test. The current mechanism candidate is the exact fixed-`k` conditional RMS exchange cost derived from `Q`, `c`, and `k`, with mean and variance retained separately. Low/high RMS are competing hypotheses; these code repairs supply no new performance evidence.
 
 ### Central hypothesis
 
@@ -44,13 +44,13 @@ Thus:
 - **software invariant:** the simulator never allocates amplitudes outside the weight-`k` basis;
 - **hardware claim:** none is made until a hardware decomposition is explicitly audited.
 
-## 3. Exact definition of the current structure signal
+## 3. Historical structure signal and current mechanism candidate
 
 For a problem matrix Q, define:
 
 `score(i,j) = |Q_ij|`, for `i < j`.
 
-The current generator:
+The historical strong-interaction generator:
 
 1. ignores diagonal entries and the linear vector c;
 2. ranks candidate edges by `score(i,j)`, with deterministic index tie-breaking;
@@ -61,17 +61,30 @@ The generator therefore uses exactly the interaction magnitudes supplied by Q. I
 
 A common positive rescaling of all off-diagonal Q values leaves the topology unchanged; signs are deliberately ignored in this first study.
 
-If a later method uses signs, diagonal terms, c, spectral features, or another structural descriptor, it is a **new method** and must be evaluated separately.
+The conditional exchange descriptor is a **new method** and must be evaluated separately from that historical rule. For an occupied-to-unoccupied exchange `i -> j`, write `d0=Q_jj-Q_ii+c_j-c_i`, `a_l=Q_jl-Q_il` for `l != i,j`, `N=n-2`, and `m=k-1`. Under a uniform feasible prior conditioned on `x_i=1,x_j=0`, define:
+
+- `mu_ij = d0 + 2*m*mean(a)`;
+- `var_ij = 4*m*(N-m)/(N-1)*mean((a-mean(a))**2)` for `N>1`;
+- `rms_ij = sqrt(mu_ij**2 + var_ij)`.
+
+For `N=0`, the mean is `d0`; for `N=1`, it is `d0+2*m*a_1`. Variance is zero for both cases, for `k=1` or `k=n-1`, and when all coefficients are equal. The mean is directed and antisymmetric. RMS is the primary symmetric score, with mean and variance separately available for mechanism interpretation. These are actual conditional transition moments, unlike the former coefficient norm. They use no solutions or optimization outcomes and are mathematically invariant under feasible-equivalent objective encodings.
+
+Numerically, reduce `2*m/N` to the integer ratio `p/d` and evaluate the mean as `(d*d0+p*sum(a_l))/d`. Feed `d` copies of each original diagonal/linear term and `p` copies of each original interaction term into one compensated sum, then divide by `d`. Thus no rounded row difference, weighted product, or centered aggregate precedes the final cancellation. For `m=N`, this is the direct compensated expression `d0+2*sum(a_l)`; for `m=0` (including `N=0`), sum only the original `d0` terms. Variance retains the reference-site calculation: form `z_l=a_l-a_r` using a compensated sum of `Q_jl,-Q_il,-Q_jr,Q_ir`, choosing the minimum reference by compensated comparisons, and use `Var(z)=Var(a)`. These are the original conditional moments without a transformed matrix. Input information already rounded away cannot be recovered; the compensated numerator and variance arithmetic must remain within floating-point range, and final rounding precludes universal bitwise invariance.
+
+Low/high RMS feed the existing minimum/maximum spanning-tree-first construction followed by ranked unused edges. Connectivity and exact edge count are preserved. Exact score ties use deterministic label-based ordering and can break permutation equivariance. Neither ranking direction is claimed to be superior before data.
 
 ## 3A. Initialization is an experimental factor
 
 Initialization is part of the algorithmic configuration, not a nuisance variable
 that can be silently "controlled away."
 
-The baseline condition uses the uniform feasible superposition. Diagnostic
-conditions use deterministic states from the lowest and highest eigenspaces of
-the mixer Hamiltonian. Both extrema are reported because the interpretation of
-"ground" versus "aligned" depends on the mixer sign convention.
+There are three conditions: `uniform`, `mixer_low`, and `mixer_high`. The
+implemented positive-sign XY adjacency has a unique positive-amplitude
+Perron--Frobenius highest state for connected mixers and `0<k<n`.
+`mixer_high` is therefore the ground state of `-H_M`; `mixer_low` is the
+opposite-extremum sensitivity condition. Neither guarantees better performance.
+The spectral-projector fallback at zero uniform overlap is deterministic but
+can depend on labels; it is not a canonical permutation-equivariant low state.
 
 Comparing a topology under different initializations measures sensitivity to the
 topology/initialization pairing. It does **not** identify a pure causal topology
@@ -80,14 +93,26 @@ separately as an alignment diagnostic.
 
 ## 3B. Cost scale and parameter domain
 
-For new mechanism-stage experiments, the cost-phase search is expressed in
-dimensionless units using the feasible cost span
-`C_max - C_min`. Equivalently, the default p=1 search uses
-`gamma_max = 2*pi/(C_max-C_min)` when the span is nonzero.
+For new mechanism-stage experiments, use `S=C_max-C_min` and optimize the
+dimensionless coordinate `u=gamma*S` on `[0,2*pi]`. The grid, L-BFGS-B, and
+Powell share the same declared bounds and use centered normalized costs
+`(C-C_min)/S` for phases and the numerical objective. Returned physical gamma
+is `u/S`. This avoids dependence of solver tolerances on raw objective units.
 
-This removes arbitrary instance-to-instance cost scaling from the fixed gamma
-box. Historical exploratory benchmarks retain a `legacy` mode with the original
-`[0,2*pi]` gamma interval so their published numbers remain reproducible.
+This is a characteristic-scale convention, not a fundamental gamma period.
+The shared beta box `[0,pi]` is also a comparison convention, not a universal
+mixer period. Domain sensitivity and optimization-reference calibration remain
+future prerequisites to interpreting new topology rankings; no calibration is
+part of this repair pass. The historical pilot and independent DKS entry points
+explicitly use `legacy`, retaining their original raw gamma `[0,2*pi]` grid,
+raw expectation objective, solver settings, and candidate selection.
+
+`finite_objective` means only that the final expectation is finite. Record the
+selected source (`grid`, `lbfgsb`, `powell`, or `not_run`) and its nullable
+success status separately from the two solver statuses. A grid result has no
+local-convergence status. Retain evaluation count, normalized improvement over
+the grid, declared coordinate bounds, and gamma/beta boundary indicators.
+Successful local termination does not certify global accuracy.
 
 ## 4. What is and is not matched
 
@@ -98,6 +123,11 @@ The pilot matches **mixer edge count** between the structure-conditioned and rin
 An equal number of graph edges is a construction-level control. It does **not** imply equal two-qubit gate count, circuit depth, routing overhead, shot cost, or hardware execution cost.
 
 The complete mixer is a higher-edge-count reference and is not a matched baseline.
+
+The initialization diagnostic requires its declared edge budget to equal the
+actual fixed-ring edge count and records actual counts for every topology.
+It compares ring, historical strong-`|Q|`, and random topologies across three
+initializations; it is not yet the planned conditional-RMS mechanism study.
 
 ### Planned resource accounting
 
@@ -143,7 +173,34 @@ For an instance with feasible costs C_min and C_max:
 
 `gap = (E[C] - C_min) / (C_max - C_min)` when C_max > C_min.
 
-If C_max = C_min, the normalized gap is undefined. Such instances require a predeclared handling rule before confirmatory evaluation; they must not be excluded after results are seen.
+For normalization, evaluate each feasible cost with `math.fsum` over individual
+occupied `Q_ij` and `c_i` coefficients. Binary occupation selects these terms
+exactly; summing them together avoids the cancellation error from separately
+rounded quadratic and linear totals. Derive `C_min`, `C_max`, and the span from
+these accurately summed costs, with no absolute raw-unit threshold. Raw costs,
+phases, and expectation arithmetic remain unchanged for legacy search.
+The gap uses normalized costs directly, and optimum classification uses tolerance
+`1e-10` in those dimensionless costs: a declared near-optimum convention.
+
+If accurately summed costs still collapse to a zero span, retain the conservative
+`cost_status="constant_or_unresolved"`. This covers true constancy and variation
+lost in input representation or final floating-point rounding. Normalized gap
+is undefined for constants; optimum probability is mathematically one for a
+proven constant, but is withheld because this policy intentionally combines
+constant and unresolved cases. Both metrics serialize as `None`, JSON `null`,
+or blank CSV. The normalized optimizer skips search with
+`selected_source="not_run"`. Nonfinite costs, compensated-summation overflow,
+or an unrepresentable span/returned physical gamma raise an explicit error.
+
+The current aggregation rule retains every raw row and validates the expected
+instance IDs supplied by the study design, never inferring completeness from
+observed IDs. Pilot summaries use the declared configuration count and zero-based
+IDs, and require every summarized outcome (normalized gap and optimum probability)
+for every comparator. Gap plots require every expected instance/comparator gap.
+Constant/unresolved rows, missing instances/comparators, and undefined/nonfinite
+outcomes cause refusal with affected/expected and completely missing instance
+counts. A future study may adopt a different predeclared policy before observing
+outcomes.
 
 ## 6. Experimental unit and independence
 
@@ -296,7 +353,11 @@ Problem structure and problem difficulty are not interchangeable. A future predi
 
 If “difficulty” is used as a feature, its construction must be audited for target leakage and circularity.
 
-The current transparent generator avoids this issue because its only input is Q.
+The historical transparent generator uses only `Q`; the current conditional
+exchange descriptor uses `Q`, `c`, and `k`. Neither uses optimum labels or
+optimization outcomes. Exact feasible-span normalization does require
+enumerating feasible costs in this small-system simulator; its computational
+cost must be acknowledged in any later scalability claim.
 
 ## 15. Required ablations
 

@@ -51,10 +51,10 @@ The original comparisons used the same uniform feasible initial state for every 
 Recent constrained-QAOA work makes this a scientifically relevant control. The simulator now supports:
 
 - `uniform`: uniform superposition over feasible weight-`k` states;
-- `mixer_low`: deterministic state in the lowest mixer eigenspace;
-- `mixer_high`: deterministic state in the highest mixer eigenspace.
+- `mixer_low`: deterministic opposite-extremum sensitivity condition in the lowest mixer eigenspace;
+- `mixer_high`: positive-amplitude Perron–Frobenius reference in the highest mixer eigenspace for connected mixers.
 
-Both spectral extrema are exposed because “ground” versus “aligned” depends on the mixer sign convention. Their overlap with the uniform state is measured separately. These modes diagnose sensitivity to the topology/initialization pairing; they do **not** by themselves isolate a pure topology effect.
+The implemented XY Hamiltonian has positive exchange amplitudes, so `mixer_high` is equivalently the ground state of `-H_M`. The spectral projector construction is deterministic; its fallback when uniform overlap vanishes can depend on variable labels. Neither extremum guarantees better QAOA performance. Their overlap with the uniform state is measured separately. These modes diagnose sensitivity to the topology/initialization pairing; they do **not** by themselves isolate a pure topology effect.
 
 `experiments/run_alignment_control.py` implements this diagnostic. **No initialization-diagnostic result has yet been folded into the main claim.**
 
@@ -66,7 +66,7 @@ The remaining hypothesis is graph-level:
 
 `instance descriptor → mixer topology → feasible-state transition graph → variational dynamics → optimization outcome`
 
-The missing link is the transition-graph mechanism. A concrete next candidate is now derived from the exact exchange-cost formula: an RMS score built from `(Q_jj-Q_ii)+(c_j-c_i)` and the row differences `Q_jl-Q_il`. Low-score and high-score versions are predeclared as competing hypotheses rather than choosing a direction after seeing performance.
+The current candidate is the exact conditional RMS exchange cost under uniformly sampled feasible states with `x_i=1`, `x_j=0`, and weight `k`. It uses `Q`, `c`, and `k`; conditional mean and variance remain separately available for interpretation. The former norm of exchange coefficients is not this fixed-`k` statistic and is no longer the primary score. Low-RMS and high-RMS topologies are competing hypotheses, with neither direction validated by these repairs.
 
 See [docs/MECHANISM_HYPOTHESIS.md](docs/MECHANISM_HYPOTHESIS.md).
 
@@ -98,7 +98,11 @@ Implemented:
 
 The strong-`|Q_ij|` rule has failed to generalize to the first independent family. The next experiment is therefore **not** another large confirmatory benchmark.
 
-The immediate study compares a small, predeclared set of structural descriptors—strong/weak `|Q_ij|`, low/high exchange-profile scores derived from the exact swap-cost formula, shuffled controls, and random topology—under explicit initialization diagnostics. New mechanism-stage runs use feasible-cost-span scaling for the gamma domain; historical results remain reproducible in legacy mode.
+The planned study compares historical strong/weak `|Q_ij|`, low/high conditional exchange RMS, shuffled controls, and random topology under all three initialization conditions. New mechanism-stage runs use the dimensionless coordinate `u = gamma * (C_max-C_min)` on `[0,2*pi]` for the grid and both local solvers; returned gamma is `u/(C_max-C_min)`. Centered, normalized costs remove objective-unit dependence from solver tolerances. This interval is a predeclared scale convention, not a fundamental period; the common beta interval `[0,pi]` is also a comparison convention. Historical pilot and independent DKS scripts explicitly retain `gamma_scale="legacy"`.
+
+Normalized costs use compensated summation of the represented QUBO coefficients, preventing cancellation noise from becoming an artificial landscape. Tiny resolved spans remain nonconstant without an absolute unit cutoff. If accurately summed costs are indistinguishable, `cost_status="constant_or_unresolved"` withholds normalized gap and optimum probability (`None`, JSON `null`, or blank CSV). A proven constant objective has optimum probability one; it is withheld here because constant and unresolved cases are intentionally combined. Raw legacy phases and expectations are unchanged. Historical summaries retain all raw rows and validate declared instance IDs, required comparators, and every summarized outcome, including optimum probability. Incomplete comparisons fail with affected/expected counts. The optimizer reports the selected candidate's source and status separately from each solver's status; `finite_objective` means only finite final expectation.
+
+This repair makes no new performance claim. Scientific domain calibration, optimization-reference studies, and mechanism performance data remain future work.
 
 The statistical sensitivity and pre-freeze machinery already in the repository is retained for reproducibility and later use. It is not the current scientific bottleneck, and no final sample-size or confirmatory-analysis claim is being made from the existing smoke runs.
 
@@ -123,7 +127,7 @@ Alignment control:
 python3 experiments/run_alignment_control.py --instances 24 --n 9 --k 4
 ```
 
-The alignment-control command generates new exploratory records; it does not modify or overwrite the existing independent benchmark results.
+The alignment-control command generates new exploratory records; it does not modify or overwrite the existing independent benchmark results. It requires `--edge-budget` to match the actual ring edge count and records actual counts. It compares ring, historical strong-`|Q|`, and random topologies across initializations; it is not yet the planned conditional-RMS mechanism study.
 
 ## Repository map
 

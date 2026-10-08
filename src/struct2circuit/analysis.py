@@ -3,12 +3,95 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterable
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from scipy.stats import wilcoxon
+
+
+def _require_defined_metrics(
+    results: pd.DataFrame,
+    method_column: str,
+    *,
+    metrics: tuple[str, ...],
+    expected_instances: Iterable[object],
+    required_methods: tuple[str, ...],
+) -> None:
+    """Check the declared comparison before pandas can skip missing values."""
+    expected = pd.Index(list(expected_instances), name="instance")
+    if expected.empty or expected.has_duplicates or expected.isna().any():
+        raise ValueError("Expected instance IDs must be nonempty, unique, and defined")
+    observed = pd.Index(results["instance"].unique())
+    missing = expected.difference(observed)
+    unexpected = observed.difference(expected)
+    if len(unexpected):
+        raise ValueError(
+            f"Cannot aggregate {', '.join(metrics)}: {len(missing)} of {len(expected)} "
+            f"expected instances are completely missing; {len(unexpected)} unexpected "
+            "instance IDs are present. Retain all raw rows."
+        )
+
+    affected = np.zeros(len(expected), dtype=bool)
+    invalid_metrics = []
+    methods = sorted(set(results[method_column]) | set(required_methods))
+    for metric in metrics:
+        pivot = (
+            results.pivot(index="instance", columns=method_column, values=metric)
+            if metric in results else pd.DataFrame()
+        )
+        # Reindex both axes: entirely absent instances and comparators must
+        # become missing values rather than disappear from the comparison.
+        pivot = pivot.reindex(index=expected, columns=methods)
+        values = pivot.to_numpy(dtype=float, na_value=np.nan)
+        invalid = ~np.isfinite(values).all(axis=1)
+        if not methods:
+            invalid[:] = True
+        if invalid.any():
+            invalid_metrics.append(metric)
+        affected |= invalid
+    unresolved_count = 0
+    if "cost_status" in results:
+        unresolved_ids = results.loc[
+            results["cost_status"] == "constant_or_unresolved", "instance"
+        ]
+        unresolved = expected.isin(unresolved_ids)
+        unresolved_count = int(np.count_nonzero(unresolved))
+        affected |= unresolved
+    count = int(np.count_nonzero(affected))
+    if count:
+        status_detail = (
+            f" {unresolved_count} expected instances are explicitly marked constant_or_unresolved."
+            if unresolved_count else ""
+        )
+        raise ValueError(
+            f"Cannot aggregate {', '.join(invalid_metrics or metrics)}: {count} of {len(expected)} "
+            "instances have undefined/nonfinite metrics, constant/unresolved costs, "
+            "or missing comparator rows; "
+            f"{len(missing)} expected instances are completely missing.{status_detail} Retain all raw "
+            "rows; no instances were silently excluded."
+        )
+
+
+def require_defined_gaps(
+    results: pd.DataFrame,
+    method_column: str,
+    *,
+    expected_instances: Iterable[object],
+    required_methods: tuple[str, ...] = (),
+) -> None:
+    """Refuse incomplete normalized-gap comparisons against declared IDs.
+
+    Raw rows must be retained by callers. No row or instance is silently dropped;
+    a constant/unresolved objective requires a separately declared study policy.
+    The expected IDs must come from the study design, not the observed rows.
+    """
+    _require_defined_metrics(
+        results, method_column, metrics=("normalized_gap",),
+        expected_instances=expected_instances, required_methods=required_methods,
+    )
 
 
 def paired_bootstrap_ci(
@@ -29,6 +112,14 @@ def paired_bootstrap_ci(
 
 
 def summarize_pilot(results: pd.DataFrame, config: dict) -> dict:
+    """Summarize the pilot's declared zero-based instance IDs, refusing omissions."""
+    count = config.get("instances")
+    if isinstance(count, bool) or not isinstance(count, (int, np.integer)) or count < 1:
+        raise ValueError("Pilot configuration must declare a positive integer 'instances' count")
+    _require_defined_metrics(
+        results, "mixer", metrics=("normalized_gap", "probability_optimum"),
+        expected_instances=range(count), required_methods=("ring", "structure", "complete"),
+    )
     pivot_gap = results.pivot(index="instance", columns="mixer", values="normalized_gap")
     pivot_prob = results.pivot(index="instance", columns="mixer", values="probability_optimum")
     improvement = pivot_gap["ring"] - pivot_gap["structure"]
@@ -120,7 +211,13 @@ Lock generator seeds before evaluation; include multiple structural regimes and 
     output_path.write_text(text, encoding="utf-8")
 
 
-def plot_pilot(results: pd.DataFrame, output_path: Path) -> None:
+def plot_pilot(
+    results: pd.DataFrame, output_path: Path, *, expected_instances: Iterable[object]
+) -> None:
+    require_defined_gaps(
+        results, "mixer", expected_instances=expected_instances,
+        required_methods=("ring", "structure", "complete"),
+    )
     order = ["ring", "structure", "complete"]
     colors = {"ring": "#64748B", "structure": "#0F766E", "complete": "#2563EB"}
     fig, axes = plt.subplots(1, 2, figsize=(10.5, 4.2), constrained_layout=True)
@@ -160,5 +257,6 @@ def plot_pilot(results: pd.DataFrame, output_path: Path) -> None:
 
 
 def save_summary(summary: dict, output_path: Path) -> None:
-    output_path.write_text(json.dumps(summary, indent=2, sort_keys=True), encoding="utf-8")
-
+    output_path.write_text(
+        json.dumps(summary, indent=2, sort_keys=True, allow_nan=False), encoding="utf-8"
+    )

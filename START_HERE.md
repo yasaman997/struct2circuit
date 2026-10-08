@@ -24,13 +24,13 @@ The important result is therefore not “structure works.” It is:
 
 The original comparison fixed the same uniform feasible initial state for every mixer. That is useful for a fixed-initialization comparison, but it does not isolate topology from mixer/initial-state alignment.
 
-The simulator now supports two explicit initialization conditions:
+The simulator supports three explicit initialization conditions:
 
 - `uniform` — uniform feasible superposition;
-- `mixer_low` — deterministic lowest-eigenspace reference;
-- `mixer_high` — deterministic highest-eigenspace reference.
+- `mixer_low` — opposite-extremum sensitivity condition in the lowest eigenspace;
+- `mixer_high` — positive-amplitude Perron–Frobenius reference for connected mixers, equivalently the ground state of `-H_M`.
 
-Both extrema are kept because the sign convention matters. This is an initialization-sensitivity diagnostic, not a claim that topology has been causally isolated. It is implemented in:
+The implemented XY Hamiltonian has positive exchange amplitudes. Neither extremum guarantees better optimization; the deterministic spectral fallback when uniform overlap is zero can depend on labels. This is a topology × initialization sensitivity diagnostic, not a claim that topology has been causally isolated. It is implemented in:
 
 ```text
 experiments/run_alignment_control.py
@@ -62,7 +62,11 @@ The missing link is the transition-graph mechanism. See [docs/MECHANISM_HYPOTHES
 
 Do **not** start another large confirmatory benchmark yet.
 
-The next study compares strong/weak `|Q_ij|` with low/high exchange-profile scores derived directly from the exact feasible swap-cost formula, plus shuffled and random controls. It reports all three initialization conditions and uses cost-span-normalized gamma search for new runs.
+The planned study compares historical strong/weak `|Q_ij|` with low/high exact conditional exchange RMS at fixed `k`, plus shuffled and random controls. Conditional mean and variance are retained separately; the former coefficient norm is no longer the primary descriptor. Low/high are competing hypotheses. All three initialization conditions are reported.
+
+New runs optimize `u = gamma * (C_max-C_min)` on `[0,2*pi]`, with centered normalized costs and identical bounds for the grid and both local solvers. Returned gamma remains in physical units. This gamma interval and the shared beta interval `[0,pi]` are declared comparison conventions, not universal periods. Both historical entry points explicitly retain `legacy` gamma semantics. No scientific domain calibration or new performance claim accompanies these repairs.
+
+Normalized costs use compensated coefficient summation without an absolute unit cutoff. If this cannot resolve distinct costs, the combined constant/unresolved status withholds normalized gap and optimum probability as JSON `null` or blank CSV. Optimum probability would be one for a proven constant; the combined policy intentionally does not make that distinction. Raw legacy arithmetic is preserved. All raw rows are retained, and summaries validate declared instance IDs, comparators, and every summarized outcome, including optimum probability; refusals report affected/expected counts. Alignment runs enforce the actual ring edge budget and record actual edge counts.
 
 The repository already contains statistical sensitivity and pre-freeze infrastructure. Those tools remain available for a later confirmatory study; they are not the current scientific bottleneck.
 

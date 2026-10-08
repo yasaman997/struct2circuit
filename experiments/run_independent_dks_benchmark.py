@@ -4,6 +4,9 @@
 This benchmark is intentionally exploratory. It uses a fresh seed namespace and a
 problem family that was not used in the original 24-instance block-correlated pilot.
 It must not be treated as the frozen benchmark-v1 evaluation.
+The historical strong-|Q| heuristic failed to generalize on this family. Legacy
+gamma units preserve that experiment; undefined gaps stop aggregation after raw
+rows have been saved, with no silent omission of instances or random controls.
 """
 
 from __future__ import annotations
@@ -22,6 +25,7 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from struct2circuit.mixers import MixerSpec, graph_connected, random_connected_mixer, ring_mixer, structure_conditioned_mixer
+from struct2circuit.analysis import require_defined_gaps
 from struct2circuit.optimize import optimize_p1
 from struct2circuit.problems import weighted_densest_k_subgraph_qubo
 from struct2circuit.simulator import FeasibleSubspaceQAOA
@@ -128,6 +132,8 @@ def main() -> None:
         raise SystemExit("--instances must be at least 4")
     if args.edge_budget < args.n - 1:
         raise SystemExit("--edge-budget must be at least n-1")
+    if args.random_replicates < 1:
+        raise SystemExit("--random-replicates must be at least 1 for the random-mean comparator")
     args.output.mkdir(parents=True, exist_ok=True)
 
     rows: list[dict] = []
@@ -167,18 +173,32 @@ def main() -> None:
                     "method": method,
                     "mixer_edges": mixer.edge_count,
                     "normalized_gap": result.result.normalized_gap,
+                    "cost_status": result.result.cost_status,
                     "probability_optimum": result.result.probability_optimum,
                     "gamma": result.gamma[0],
                     "beta": result.beta[0],
-                    "optimizer_success": result.optimizer_success,
+                    "gamma_scale": "legacy",
+                    "finite_objective": result.finite_objective,
+                    "selected_source": result.selected_source,
+                    "selected_source_success": result.selected_source_success,
+                    "lbfgsb_success": result.lbfgsb_success,
+                    "powell_success": result.powell_success,
+                    "local_refinement_converged": result.local_refinement_converged,
+                    "objective_evaluations": result.objective_evaluations,
                     "interaction_alignment": interaction_alignment(problem.Q, mixer.edges),
                 }
             )
 
     raw = pd.DataFrame(rows)
     raw_path = args.output / "independent_dks_benchmark_v1_raw.csv"
-    raw.to_csv(raw_path, index=False)
+    raw.to_csv(raw_path, index=False, na_rep="")
 
+    require_defined_gaps(
+        raw, "method", expected_instances=range(args.instances), required_methods=(
+            "ring", "structure", "inverse_structure",
+            *(f"random_{replicate:02d}" for replicate in range(args.random_replicates)),
+        ),
+    )
     pivot = raw.pivot(index="instance", columns="method", values="normalized_gap")
     random_columns = [c for c in pivot.columns if c.startswith("random_")]
     random_mean = pivot[random_columns].mean(axis=1)

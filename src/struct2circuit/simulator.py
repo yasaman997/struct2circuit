@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from math import fsum
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
@@ -18,10 +19,11 @@ ComplexArray = NDArray[np.complex128]
 @dataclass(frozen=True)
 class QAOAResult:
     expectation: float
-    normalized_gap: float
-    probability_optimum: float
+    normalized_gap: float | None
+    probability_optimum: float | None
     state_norm: float
     feasibility_probability: float
+    cost_status: str
 
 
 class FeasibleSubspaceQAOA:
@@ -29,10 +31,11 @@ class FeasibleSubspaceQAOA:
 
     ``initialization="uniform"`` is the common baseline used by the pilot.
     ``initialization="mixer_low"`` and ``"mixer_high"`` select deterministic
-    states from the lowest/highest mixer eigenspaces. Both spectral extrema are
-    exposed because which one represents an aligned reference depends on the
-    mixer sign convention. These are diagnostics, not hardware state-preparation
-    claims.
+    states from the lowest/highest mixer eigenspaces. For the implemented
+    positive XY adjacency, the connected feasible graph has a unique positive
+    Perron--Frobenius highest eigenstate (the ground state of ``-H_M``).
+    The low state is an opposite-extremum sensitivity condition. Neither mode
+    guarantees better optimization or constitutes a hardware preparation claim.
     """
 
     def __init__(
@@ -53,9 +56,46 @@ class FeasibleSubspaceQAOA:
         self.initialization = initialization
         self.basis = problem.feasible_basis()
         self.costs = problem.costs(self.basis)
-        self.cost_min = float(np.min(self.costs))
-        self.cost_max = float(np.max(self.costs))
-        self.optimal_mask = np.isclose(self.costs, self.cost_min, rtol=0.0, atol=1e-10)
+        if not np.all(np.isfinite(self.costs)):
+            raise ValueError("feasible costs exceed the supported finite floating-point range")
+        # Preserve raw costs for legacy phases and expectations. For normalized
+        # dynamics, sum the represented coefficients together with compensated
+        # partial sums: separately rounded quadratic/linear totals can otherwise
+        # turn exact cancellation into a fictitious nonconstant landscape.
+        # Binary occupation selects coefficients exactly, without products or
+        # pre-addition of symmetric pairs that could introduce rounding first.
+        accurate_costs = []
+        try:
+            for state in self.basis:
+                occupied = np.flatnonzero(state)
+                accurate_costs.append(fsum(
+                    [float(problem.Q[i, j]) for i in occupied for j in occupied]
+                    + [float(problem.c[i]) for i in occupied]
+                ))
+        except OverflowError as error:
+            raise ValueError(
+                "accurate feasible costs exceed the supported floating-point range"
+            ) from error
+        normalization_costs = np.asarray(accurate_costs)
+        self.cost_min = float(np.min(normalization_costs))
+        self.cost_max = float(np.max(normalization_costs))
+        self.feasible_span = self.cost_max - self.cost_min
+        if not np.isfinite(self.feasible_span):
+            raise ValueError("feasible cost span exceeds the supported floating-point range")
+        # No absolute raw-cost cutoff. If even accurate summation cannot resolve
+        # distinct float64 costs, withhold normalized metrics: true constancy and
+        # variation lost in input representation/final rounding remain combined.
+        self.cost_status = (
+            "nonconstant" if self.feasible_span > 0.0 else "constant_or_unresolved"
+        )
+        self.normalized_costs = (
+            (normalization_costs - self.cost_min) / self.feasible_span
+            if self.feasible_span > 0.0 else None
+        )
+        self.optimal_mask = (
+            np.isclose(self.normalized_costs, 0.0, rtol=0.0, atol=1e-10)
+            if self.normalized_costs is not None else np.zeros(len(self.costs), dtype=bool)
+        )
         self.mixer_hamiltonian = xy_mixer_hamiltonian(self.basis, mixer)
         self._mixer_eigenvalues, self._mixer_eigenvectors = np.linalg.eigh(
             self.mixer_hamiltonian
@@ -87,7 +127,9 @@ class FeasibleSubspaceQAOA:
 
         If the uniform state has nonzero projection into the eigenspace, use the
         normalized projection. Otherwise resolve degeneracy deterministically by
-        projecting computational-basis vectors in lexicographic order.
+        projecting computational-basis vectors in lexicographic order. The
+        fallback is independent of the eigenvector basis up to phase, but can
+        depend on vertex labels; determinism does not imply permutation equivariance.
         """
         eigenspace = self._mixer_eigenvectors[:, self._extremal_mask(which)]
         projected = eigenspace @ (eigenspace.conj().T @ self.uniform_state)
@@ -138,14 +180,48 @@ class FeasibleSubspaceQAOA:
 
     def evaluate(self, gamma: ArrayLike, beta: ArrayLike) -> QAOAResult:
         psi = self.state(gamma, beta)
+        return self._evaluate_state(psi)
+
+    def state_dimensionless(self, u: ArrayLike, beta: ArrayLike) -> ComplexArray:
+        """Apply cost phases using ``u = gamma * feasible_span``.
+
+        Centering costs removes an irrelevant global phase and normalizing them
+        avoids raw-unit dependence in the new optimizer's coordinates. A zero
+        accurately summed span has no resolved cost dynamics and uses the identity phase.
+        ``state`` retains its original raw-phase arithmetic for legacy searches.
+        """
+        us = np.atleast_1d(np.asarray(u, dtype=float))
+        betas = np.atleast_1d(np.asarray(beta, dtype=float))
+        if us.shape != betas.shape or us.ndim != 1:
+            raise ValueError("u and beta must be one-dimensional arrays of equal length")
+        psi = self.initial_state.copy()
+        for coordinate, b in zip(us, betas, strict=True):
+            if self.normalized_costs is not None:
+                psi *= np.exp(-1j * coordinate * self.normalized_costs)
+            psi = self._apply_mixer(psi, float(b))
+        return psi
+
+    def evaluate_dimensionless(self, u: ArrayLike, beta: ArrayLike) -> QAOAResult:
+        """Evaluate normalized phases without round-tripping through physical gamma."""
+        return self._evaluate_state(self.state_dimensionless(u, beta))
+
+    def _evaluate_state(self, psi: ComplexArray) -> QAOAResult:
         probabilities = np.abs(psi) ** 2
+        # Keep the historical raw expectation arithmetic used by legacy search.
         expectation = float(probabilities @ self.costs)
-        span = self.cost_max - self.cost_min
-        gap = 0.0 if span <= 1e-14 else (expectation - self.cost_min) / span
+        gap = (
+            float(probabilities @ self.normalized_costs)
+            if self.normalized_costs is not None else None
+        )
+        probability_optimum = (
+            float(np.sum(probabilities[self.optimal_mask]))
+            if self.normalized_costs is not None else None
+        )
         return QAOAResult(
             expectation=expectation,
-            normalized_gap=float(gap),
-            probability_optimum=float(np.sum(probabilities[self.optimal_mask])),
+            normalized_gap=gap,
+            probability_optimum=probability_optimum,
             state_norm=float(np.linalg.norm(psi)),
             feasibility_probability=float(np.sum(probabilities)),
+            cost_status=self.cost_status,
         )

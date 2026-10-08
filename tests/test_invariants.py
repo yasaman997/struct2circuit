@@ -85,7 +85,7 @@ class InvariantTests(unittest.TestCase):
 
 
     def test_exchange_profile_score_is_symmetric_and_finite(self) -> None:
-        scores = exchange_profile_scores(self.problem.Q, self.problem.c)
+        scores = exchange_profile_scores(self.problem.Q, self.problem.c, self.problem.k)
         self.assertEqual(scores.shape, self.problem.Q.shape)
         self.assertTrue(np.allclose(scores, scores.T))
         self.assertTrue(np.all(np.isfinite(scores)))

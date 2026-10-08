@@ -4,7 +4,11 @@
 This diagnostic does not isolate a pure topology effect: each spectral reference
 is part of a topology+initialization algorithmic configuration. Both mixer
 spectral extrema are reported so the interpretation is explicit under the
-chosen Hamiltonian sign convention.
+chosen positive XY Hamiltonian: high is the positive Perron-Frobenius reference
+for connected mixers, low is the opposite-extremum sensitivity condition.
+Neither guarantees better performance. The historical strong-|Q| comparator is
+not the new conditional-RMS mechanism method. This is a topology x initialization
+sensitivity diagnostic, with a matched actual ring edge count.
 """
 
 from __future__ import annotations
@@ -46,6 +50,12 @@ def main() -> None:
     args = parse_args()
     if args.edge_budget < args.n - 1:
         raise SystemExit("--edge-budget must be at least n-1")
+    ring = ring_mixer(args.n)
+    if args.edge_budget != ring.edge_count:
+        raise SystemExit(
+            f"--edge-budget must equal the actual ring edge count ({ring.edge_count}) "
+            "for a matched-ring diagnostic"
+        )
     args.output.parent.mkdir(parents=True, exist_ok=True)
 
     rows: list[dict] = []
@@ -59,7 +69,7 @@ def main() -> None:
             planted_community_strength=args.planted_strength,
         )
         mixers = [
-            ("ring", ring_mixer(args.n)),
+            ("ring", ring),
             ("structure", structure_conditioned_mixer(problem.Q, args.edge_budget)),
         ]
         for replicate in range(args.random_replicates):
@@ -79,19 +89,34 @@ def main() -> None:
                         "instance": instance,
                         "problem_seed": problem_seed,
                         "method": method,
+                        "n": args.n,
+                        "k": args.k,
+                        "mixer_edges": mixer.edge_count,
                         "initialization": initialization,
                         "uniform_low_eigenspace_fidelity": simulator.uniform_mixer_extremal_fidelity("low"),
                         "uniform_high_eigenspace_fidelity": simulator.uniform_mixer_extremal_fidelity("high"),
                         "normalized_gap": result.result.normalized_gap,
+                        "cost_status": result.result.cost_status,
                         "probability_optimum": result.result.probability_optimum,
                         "gamma": result.gamma[0],
                         "beta": result.beta[0],
                         "finite_objective": result.finite_objective,
+                        "selected_source": result.selected_source,
+                        "selected_source_success": result.selected_source_success,
+                        "lbfgsb_success": result.lbfgsb_success,
+                        "powell_success": result.powell_success,
                         "local_refinement_converged": result.local_refinement_converged,
+                        "objective_evaluations": result.objective_evaluations,
+                        "gamma_scale": "feasible_span",
+                        "gamma_coordinate": result.gamma_coordinate,
+                        "parameter_bounds": result.parameter_bounds,
+                        "improvement_over_grid": result.improvement_over_grid,
+                        "gamma_boundary_hit": result.gamma_boundary_hit,
+                        "beta_boundary_hit": result.beta_boundary_hit,
                     }
                 )
 
-    pd.DataFrame(rows).to_csv(args.output, index=False)
+    pd.DataFrame(rows).to_csv(args.output, index=False, na_rep="")
     print(f"wrote alignment-control results to {args.output}")
 
 

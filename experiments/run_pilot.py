@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Run the deterministic Struct2Circuit depth-one pilot."""
+"""Reproduce the historical strong-|Q| depth-one pilot using legacy gamma units.
+
+This historical heuristic failed to generalize to the independent DKS family.
+Raw rows are retained; undefined normalized gaps stop comparative aggregation.
+"""
 
 from __future__ import annotations
 
@@ -60,7 +64,7 @@ def main() -> None:
         ]
         for mixer in mixers:
             simulator = FeasibleSubspaceQAOA(problem, mixer)
-            optimum = optimize_p1(simulator, grid_size=args.grid_size)
+            optimum = optimize_p1(simulator, grid_size=args.grid_size, gamma_scale="legacy")
             result = optimum.result
             records.append({
                 "instance": instance,
@@ -76,11 +80,17 @@ def main() -> None:
                 "beta": optimum.beta[0],
                 "expectation": result.expectation,
                 "normalized_gap": result.normalized_gap,
+                "cost_status": result.cost_status,
                 "probability_optimum": result.probability_optimum,
                 "feasibility_probability": result.feasibility_probability,
                 "state_norm": result.state_norm,
                 "objective_evaluations": optimum.objective_evaluations,
-                "optimizer_success": optimum.optimizer_success,
+                "gamma_scale": "legacy",
+                "finite_objective": optimum.finite_objective,
+                "selected_source": optimum.selected_source,
+                "selected_source_success": optimum.selected_source_success,
+                "lbfgsb_success": optimum.lbfgsb_success,
+                "powell_success": optimum.powell_success,
                 "local_refinement_converged": optimum.local_refinement_converged,
             })
 
@@ -95,11 +105,14 @@ def main() -> None:
         "equal_budget_mixer_edges": edge_budget,
         "generator": "block_correlated_qubo",
     }
+    results.to_csv(args.output / "pilot_results.csv", index=False, na_rep="")
     summary = summarize_pilot(results, config)
-    results.to_csv(args.output / "pilot_results.csv", index=False)
     save_summary(summary, args.output / "pilot_summary.json")
     write_report(summary, args.output / "pilot_report.md")
-    plot_pilot(results, args.output / "pilot_quality_resource.png")
+    plot_pilot(
+        results, args.output / "pilot_quality_resource.png",
+        expected_instances=range(args.instances),
+    )
     pair = summary["paired_structure_vs_ring"]
     print(f"wrote {len(results)} rows to {args.output}")
     print(
