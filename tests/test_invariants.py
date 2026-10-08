@@ -12,6 +12,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from struct2circuit.mixers import (  # noqa: E402
     complete_mixer,
+    exchange_profile_scores,
     graph_connected,
     ring_mixer,
     structure_conditioned_mixer,
@@ -62,23 +63,48 @@ class InvariantTests(unittest.TestCase):
         b = optimize_p1(sim, grid_size=7)
         self.assertAlmostEqual(a.result.expectation, b.result.expectation, places=10)
 
-    def test_mixer_ground_initialization_is_normalized_and_feasible(self) -> None:
-        sim = FeasibleSubspaceQAOA(
-            self.problem,
-            structure_conditioned_mixer(self.problem.Q, self.problem.n),
-            initialization="mixer_ground",
-        )
-        self.assertAlmostEqual(np.linalg.norm(sim.initial_state), 1.0, places=11)
-        self.assertAlmostEqual(np.sum(np.abs(sim.initial_state) ** 2), 1.0, places=11)
-        self.assertGreaterEqual(sim.uniform_mixer_ground_state_fidelity, 0.0)
-        self.assertLessEqual(sim.uniform_mixer_ground_state_fidelity, 1.0)
+    def test_mixer_extremal_initializations_are_normalized_and_feasible(self) -> None:
+        mixer = structure_conditioned_mixer(self.problem.Q, self.problem.n)
+        for initialization in ("mixer_low", "mixer_high"):
+            sim = FeasibleSubspaceQAOA(self.problem, mixer, initialization=initialization)
+            self.assertAlmostEqual(np.linalg.norm(sim.initial_state), 1.0, places=11)
+            self.assertAlmostEqual(np.sum(np.abs(sim.initial_state) ** 2), 1.0, places=11)
+            for which in ("low", "high"):
+                fidelity = sim.uniform_mixer_extremal_fidelity(which)
+                self.assertGreaterEqual(fidelity, 0.0)
+                self.assertLessEqual(fidelity, 1.0)
 
     def test_uniform_and_aligned_initializations_are_explicitly_distinct_controls(self) -> None:
         mixer = structure_conditioned_mixer(self.problem.Q, self.problem.n)
         uniform = FeasibleSubspaceQAOA(self.problem, mixer, initialization="uniform")
-        aligned = FeasibleSubspaceQAOA(self.problem, mixer, initialization="mixer_ground")
+        low = FeasibleSubspaceQAOA(self.problem, mixer, initialization="mixer_low")
+        high = FeasibleSubspaceQAOA(self.problem, mixer, initialization="mixer_high")
         self.assertTrue(np.allclose(uniform.initial_state, uniform.uniform_state))
-        self.assertTrue(np.allclose(aligned.initial_state, aligned.mixer_ground_state))
+        self.assertTrue(np.allclose(low.initial_state, low.mixer_low_state))
+        self.assertTrue(np.allclose(high.initial_state, high.mixer_high_state))
+
+
+    def test_exchange_profile_score_is_symmetric_and_finite(self) -> None:
+        scores = exchange_profile_scores(self.problem.Q, self.problem.c, self.problem.k)
+        self.assertEqual(scores.shape, self.problem.Q.shape)
+        self.assertTrue(np.allclose(scores, scores.T))
+        self.assertTrue(np.all(np.isfinite(scores)))
+        self.assertTrue(np.allclose(np.diag(scores), 0.0))
+
+
+    def test_cost_span_scaling_is_invariant_to_positive_cost_rescaling(self) -> None:
+        mixer = ring_mixer(self.problem.n)
+        base = FeasibleSubspaceQAOA(self.problem, mixer)
+        scaled_problem = type(self.problem)(
+            7.0 * self.problem.Q,
+            7.0 * self.problem.c,
+            self.problem.k,
+            name="scaled",
+        )
+        scaled = FeasibleSubspaceQAOA(scaled_problem, mixer)
+        a = optimize_p1(base, grid_size=7, gamma_scale="feasible_span")
+        b = optimize_p1(scaled, grid_size=7, gamma_scale="feasible_span")
+        self.assertAlmostEqual(a.result.normalized_gap, b.result.normalized_gap, places=8)
 
 
 if __name__ == "__main__":
