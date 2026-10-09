@@ -56,6 +56,10 @@ def _sample_weight(
 class CardinalityQUBO:
     """Minimize ``x.T @ Q @ x + c.T @ x`` subject to ``sum(x) == k``.
 
+    Construction requires finite square Q with n >= 2 and a finite length-n
+    vector c. Cardinality accepts Python/NumPy integer scalars, excludes
+    booleans and floats, and is stored as a Python int with 0 < k < n.
+
     Symmetry validation allows only an entrywise absolute discrepancy of
     ``1e-12`` (``rtol=0``), matching the exchange descriptor. Inputs are retained
     without symmetrization, and costs use both supplied matrix triangles.
@@ -78,14 +82,23 @@ class CardinalityQUBO:
         c = np.asarray(self.c, dtype=float)
         if q.ndim != 2 or q.shape[0] != q.shape[1]:
             raise ValueError("Q must be a square matrix")
-        if c.shape != (q.shape[0],):
-            raise ValueError("c must have one entry per binary variable")
+        if q.shape[0] < 2:
+            raise ValueError("Q must have at least two binary variables")
+        if not np.isfinite(q).all():
+            raise ValueError("Q must contain only finite coefficients")
+        if c.ndim != 1 or c.shape != (q.shape[0],):
+            raise ValueError("c must be a one-dimensional vector with one entry per binary variable")
+        if not np.isfinite(c).all():
+            raise ValueError("c must contain only finite coefficients")
+        if isinstance(self.k, (bool, np.bool_)) or not isinstance(self.k, (int, np.integer)):
+            raise ValueError("k must be an integer scalar, not a boolean or float")
         if not 0 < self.k < q.shape[0]:
             raise ValueError("k must satisfy 0 < k < n")
         if not np.allclose(q, q.T, rtol=0.0, atol=1e-12):
             raise ValueError("Q must be symmetric")
         object.__setattr__(self, "Q", q)
         object.__setattr__(self, "c", c)
+        object.__setattr__(self, "k", int(self.k))
 
     @property
     def n(self) -> int:

@@ -26,6 +26,7 @@ if str(SRC) not in sys.path:
 
 from struct2circuit.mixers import random_connected_mixer, ring_mixer, structure_conditioned_mixer
 from struct2circuit.optimize import optimize_p1
+from struct2circuit.outputs import preflight_outputs
 from struct2circuit.problems import weighted_densest_k_subgraph_qubo
 from struct2circuit.simulator import FeasibleSubspaceQAOA
 
@@ -56,6 +57,10 @@ def main() -> None:
             f"--edge-budget must equal the actual ring edge count ({ring.edge_count}) "
             "for a matched-ring diagnostic"
         )
+    try:
+        preflight_outputs((args.output,))
+    except FileExistsError as error:
+        raise SystemExit(str(error)) from error
     args.output.parent.mkdir(parents=True, exist_ok=True)
 
     rows: list[dict] = []

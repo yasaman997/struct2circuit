@@ -48,6 +48,9 @@ class ExperimentSmokeTests(unittest.TestCase):
     def test_historical_pilot_completes(self) -> None:
         with TemporaryDirectory() as directory:
             output = Path(directory) / "pilot"
+            output.mkdir()
+            note = output / "notes.txt"
+            note.write_text("unrelated file must survive")
             result = self.run_script(
                 "run_pilot.py", output,
                 "--instances", "4", "--n", "4", "--k", "2", "--grid-size", "5",
@@ -60,10 +63,14 @@ class ExperimentSmokeTests(unittest.TestCase):
             self.assertEqual(summary["configuration"]["instances"], 4)
             self.assertTrue((output / "pilot_report.md").is_file())
             self.assertTrue((output / "pilot_quality_resource.png").is_file())
+            self.assertEqual(note.read_text(), "unrelated file must survive")
 
     def test_historical_dks_completes(self) -> None:
         with TemporaryDirectory() as directory:
             output = Path(directory) / "dks"
+            output.mkdir()
+            note = output / "notes.txt"
+            note.write_text("unrelated file must survive")
             result = self.run_script(
                 "run_independent_dks_benchmark.py", output,
                 "--instances", "4", "--n", "4", "--k", "2", "--edge-budget", "4",
@@ -74,6 +81,7 @@ class ExperimentSmokeTests(unittest.TestCase):
             self.assertEqual(len(rows), 16)
             self.assert_historical_semantics(rows)
             self.assertEqual(len(self.read_rows(output / "independent_dks_benchmark_v1_instances.csv")), 4)
+            self.assertEqual(note.read_text(), "unrelated file must survive")
 
     def test_constant_dks_retains_raw_rows_and_refuses_summary(self) -> None:
         # Every k=1 DKS cost is zero, regardless of sampled graph weights.

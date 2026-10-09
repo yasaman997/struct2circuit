@@ -24,6 +24,7 @@ import pandas as pd  # noqa: E402
 from struct2circuit.analysis import plot_pilot, save_summary, summarize_pilot, write_report  # noqa: E402
 from struct2circuit.mixers import complete_mixer, ring_mixer, structure_conditioned_mixer  # noqa: E402
 from struct2circuit.optimize import optimize_p1  # noqa: E402
+from struct2circuit.outputs import preflight_outputs  # noqa: E402
 from struct2circuit.problems import block_correlated_qubo  # noqa: E402
 from struct2circuit.simulator import FeasibleSubspaceQAOA  # noqa: E402
 
@@ -45,6 +46,13 @@ def main() -> None:
     if args.instances < 4:
         raise SystemExit("--instances must be at least 4")
     edge_budget = args.n if args.edge_budget is None else args.edge_budget
+    try:
+        preflight_outputs(args.output / name for name in (
+            "pilot_results.csv", "pilot_summary.json", "pilot_report.md",
+            "pilot_quality_resource.png",
+        ))
+    except FileExistsError as error:
+        raise SystemExit(str(error)) from error
     args.output.mkdir(parents=True, exist_ok=True)
 
     records: list[dict] = []
