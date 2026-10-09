@@ -156,9 +156,10 @@ class CostMetricTests(unittest.TestCase):
             self.assertEqual(int(sim.optimal_mask.sum()), 1)
 
     def test_nonfinite_costs_are_explicitly_rejected(self):
-        with np.errstate(invalid="ignore"):
-            with self.assertRaisesRegex(ValueError, "finite floating-point range"):
-                self.simulator([0, 1, np.inf, 4])
+        # Invalid coefficients now fail at problem construction, before the
+        # simulator can attempt feasible-cost evaluation.
+        with self.assertRaisesRegex(ValueError, "c must contain only finite coefficients"):
+            self.simulator([0, 1, np.inf, 4])
 
     def test_unrepresentable_span_is_explicitly_rejected(self):
         with np.errstate(over="ignore", invalid="ignore"):

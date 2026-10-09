@@ -21,6 +21,10 @@ The simulator supports `uniform`, `mixer_low`, and `mixer_high`. With positive-s
 
 All previously stored reports, CSV/JSON records, and the PNG figure are left unchanged. In particular, this semantics repair does not regenerate the pilot or independent DKS results, rewrite their statistics, or change their experimental conclusions.
 
+The pilot and independent DKS entry points preflight every output destination and refuse existing artifacts before simulation. To reproduce them, explicitly select a fresh directory with `--output`; unrelated files in that directory are preserved. The alignment entry point applies the same check to its output filename. There is no overwrite option, automatic random path, or dependency on Git metadata.
+
+The result field `expectation` retains legacy raw NumPy cost arithmetic even for dimensionless runs. Normalized gap, extrema, span, and optimum classification use compensated float64 costs instead; a gap reconstructed from the raw expectation can disagree through cancellation or rounding. Historical expectation values retain their original meaning.
+
 Historical optimum-probability values reflect the earlier implementation's tolerance-based treatment of near-minimal states. The corrected `probability_optimum` sums probability only for states whose compensated float64 cost equals the minimum, before normalization or division. Distinct represented costs are not merged by a near-optimal tolerance; ties introduced by final cost rounding remain numerical ties, so this is not a claim of exact rational minimization. Recomputing probability metrics under the corrected semantics may therefore change reported values; any future recomputation must be identified separately rather than silently replacing these artifacts. The conservative `constant_or_unresolved` policy continues to withhold normalized gap and optimum probability when costs cannot be resolved.
 
 The retained [pre-freeze sensitivity output](prefreeze_sensitivity.json) concerns analysis infrastructure, not QAOA performance or approval of a confirmatory benchmark.

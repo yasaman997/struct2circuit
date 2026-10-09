@@ -27,6 +27,7 @@ if str(SRC) not in sys.path:
 from struct2circuit.mixers import MixerSpec, graph_connected, random_connected_mixer, ring_mixer, structure_conditioned_mixer
 from struct2circuit.analysis import require_defined_gaps
 from struct2circuit.optimize import optimize_p1
+from struct2circuit.outputs import preflight_outputs
 from struct2circuit.problems import weighted_densest_k_subgraph_qubo
 from struct2circuit.simulator import FeasibleSubspaceQAOA
 
@@ -134,6 +135,13 @@ def main() -> None:
         raise SystemExit("--edge-budget must be at least n-1")
     if args.random_replicates < 1:
         raise SystemExit("--random-replicates must be at least 1 for the random-mean comparator")
+    try:
+        preflight_outputs(args.output / name for name in (
+            "independent_dks_benchmark_v1_raw.csv",
+            "independent_dks_benchmark_v1_instances.csv",
+        ))
+    except FileExistsError as error:
+        raise SystemExit(str(error)) from error
     args.output.mkdir(parents=True, exist_ok=True)
 
     rows: list[dict] = []

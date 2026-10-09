@@ -104,6 +104,10 @@ Normalized costs use compensated summation of the represented QUBO coefficients,
 
 QUBO construction and exchange descriptors share an absolute symmetry check: `rtol=0`, `atol=1e-12`, without symmetrizing inputs. Exact descriptor identities assume symmetric `Q`; accepted small asymmetry is input tolerance, not a relative-accuracy guarantee for tiny objectives. Stored historical results are preserved; recomputing their probability metrics under minimum equality may change values previously obtained with the near-optimum mask.
 
+`CardinalityQUBO` requires finite square `Q` with at least two variables and a finite one-dimensional length-`n` vector `c`. It accepts Python and NumPy integer scalar cardinalities with `0 < k < n`, stores `k` as a Python integer, and rejects booleans and floats at construction.
+
+The reported `expectation` always averages the legacy raw NumPy QUBO costs, in raw units, including after `feasible_span` optimization. Compensated costs instead define the extrema, span, normalized dynamics, `normalized_gap`, and optimum mask. Cancellation and rounding can make `(expectation-C_min)/(C_max-C_min)` disagree with the reported gap; the gap is computed by averaging normalized compensated costs directly. A finite raw expectation does not certify accuracy of that raw arithmetic. No separately named compensated-expectation field is added.
+
 This repair makes no new performance claim. The next scientific phase is a small, predeclared gamma/beta-domain and optimizer calibration. Controlled mechanism comparisons follow calibration.
 
 The statistical sensitivity and pre-freeze machinery already in the repository is retained for reproducibility and later use. It is not the current scientific bottleneck, and no final sample-size or confirmatory-analysis claim is being made from the existing smoke runs.
@@ -122,6 +126,8 @@ Optional historical pilot reproduction, writing outside the preserved results:
 ```bash
 python3 experiments/run_pilot.py --instances 24 --n 8 --k 3 --output /tmp/struct2circuit-pilot-reproduction
 ```
+
+The pilot and independent DKS scripts check every destination before simulation and refuse existing artifacts. Select a fresh output directory with `--output`; existing directories containing only unrelated files are allowed, and those files are preserved. Alignment output is a filename and uses the same collision check. The checks require no Git metadata and provide no overwrite flag.
 
 Alignment control:
 

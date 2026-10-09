@@ -28,6 +28,12 @@ We study:
 
 **Subject to:** `Σᵢ xᵢ = k`, with `x ∈ {0,1}ⁿ`.
 
+The software constructor requires finite square `Q` with `n >= 2` and a finite
+one-dimensional length-`n` vector `c`. Cardinality must be a Python or NumPy
+integer scalar with `0 < k < n`; booleans and floats are rejected before basis
+enumeration. Accepted cardinalities are stored as Python integers. The absolute
+symmetry policy remains `rtol=0`, `atol=1e-12`, without symmetrizing inputs.
+
 Define the Hamming-weight operator:
 
 `N = Σᵢ (I - Zᵢ) / 2`.
@@ -171,7 +177,8 @@ A claim must be tied to the outcome actually measured.
 
 For an instance with feasible costs C_min and C_max:
 
-`gap = (E[C] - C_min) / (C_max - C_min)` when C_max > C_min.
+`gap = Σ_x p(x) * ((C_comp(x) - C_min) / (C_max - C_min))` when C_max > C_min,
+where `C_comp` denotes the compensated float64 feasible costs.
 
 For normalization, evaluate each feasible cost with `math.fsum` over individual
 occupied `Q_ij` and `c_i` coefficients. Binary occupation selects these terms
@@ -179,6 +186,17 @@ exactly; summing them together avoids the cancellation error from separately
 rounded quadratic and linear totals. Derive `C_min`, `C_max`, and the span from
 these accurately summed costs, with no absolute raw-unit threshold. Raw costs,
 phases, and expectation arithmetic remain unchanged for legacy search.
+
+`QAOAResult.expectation` always averages ordinary NumPy QUBO costs, with the
+quadratic and linear totals evaluated separately, in raw units. This reporting
+contract also applies after dimensionless optimization; `finite_objective`
+checks that raw expectation's finiteness only. Cancellation or rounding can
+make `(expectation-C_min)/(C_max-C_min)` disagree with the reported normalized
+gap. Even separately averaging compensated costs before centering can lose
+small gaps at large offsets, so the implementation averages normalized costs
+directly. No compensated-expectation field is introduced, and raw expectation
+must not be interpreted as the normalized optimizer's objective.
+
 The gap uses normalized costs directly. For resolved, nonconstant costs,
 `probability_optimum` sums probability over states whose compensated float64 cost
 equals `C_min` exactly, before division by the span. No proximity tolerance is

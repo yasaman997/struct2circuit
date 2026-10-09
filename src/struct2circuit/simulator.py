@@ -20,6 +20,13 @@ ComplexArray = NDArray[np.complex128]
 class QAOAResult:
     """QAOA outcomes for the declared numerical objective.
 
+    ``expectation`` is the probability-weighted legacy NumPy cost evaluation,
+    with separately evaluated quadratic and linear totals, in raw cost units.
+    This remains true after dimensionless optimization. ``normalized_gap``
+    averages centered, normalized compensated float64 costs instead; computing
+    it from ``expectation`` and the compensated extrema can give a different
+    answer through cancellation or rounding. It is not a raw-expectation gap.
+
     ``probability_optimum`` sums probability on exact minimum-equality states
     of the compensated float64 feasible costs used for normalization. It has
     no near-optimum tolerance; final cost-rounding ties remain numerical ties.
