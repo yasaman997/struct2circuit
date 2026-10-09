@@ -54,7 +54,18 @@ def _sample_weight(
 
 @dataclass(frozen=True)
 class CardinalityQUBO:
-    """Minimize ``x.T @ Q @ x + c.T @ x`` subject to ``sum(x) == k``."""
+    """Minimize ``x.T @ Q @ x + c.T @ x`` subject to ``sum(x) == k``.
+
+    Symmetry validation allows only an entrywise absolute discrepancy of
+    ``1e-12`` (``rtol=0``), matching the exchange descriptor. Inputs are retained
+    without symmetrization, and costs use both supplied matrix triangles.
+    Exactly symmetric inputs are required for exact symmetric-Q exchange
+    identities. If ``eps = max(abs(Q - Q.T))`` is nonzero but accepted, the
+    symmetric-Q formula differs from any actual feasible swap cost by at most
+    ``2 * (k - 1) * eps``; its conditional mean and RMS obey the same absolute
+    bound, apart from floating-point evaluation error. This tolerance permits
+    small input noise, not a relative-error guarantee for tiny objectives.
+    """
 
     Q: FloatArray
     c: FloatArray
@@ -71,7 +82,7 @@ class CardinalityQUBO:
             raise ValueError("c must have one entry per binary variable")
         if not 0 < self.k < q.shape[0]:
             raise ValueError("k must satisfy 0 < k < n")
-        if not np.allclose(q, q.T, atol=1e-12):
+        if not np.allclose(q, q.T, rtol=0.0, atol=1e-12):
             raise ValueError("Q must be symmetric")
         object.__setattr__(self, "Q", q)
         object.__setattr__(self, "c", c)

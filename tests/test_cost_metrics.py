@@ -150,7 +150,7 @@ class CostMetricTests(unittest.TestCase):
         self.assertEqual(sim.cost_status, "constant_or_unresolved")
         self.assertIsNone(sim.evaluate_dimensionless([0.0], [0.0]).normalized_gap)
 
-    def test_near_optimum_tolerance_is_relative_to_feasible_span(self):
+    def test_resolved_near_minimum_is_excluded_across_objective_scales(self):
         for scale in (1e-16, 1.0, 1e16):
             sim = self.simulator([0, 1, 1 + 1e-7, 4], scale=scale)
             self.assertEqual(int(sim.optimal_mask.sum()), 1)

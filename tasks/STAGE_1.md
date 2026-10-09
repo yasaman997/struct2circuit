@@ -1,5 +1,7 @@
 # Stage 1 task: benchmark foundations and essential controls
 
+> **Historical infrastructure plan.** This document preserves the Stage 1 tasks and completion record from the strong-`|Q_ij|` phase. It does not authorize a new experiment or freeze a benchmark. The current candidate is fixed-cardinality conditional exchange RMS, and numerical calibration comes next; see the [current pre-freeze status](PREFREEZE_DESIGN.md).
+
 ## Stage objective
 
 Build the infrastructure needed to test whether QUBO interaction structure contains useful signal for constrained mixer design beyond fixed or random equal-edge mixer graphs.
@@ -10,7 +12,7 @@ Stage 1 builds infrastructure only. It does not train a learned policy or run th
 
 - **equal-edge:** same number of mixer graph edges;
 - **quantum-resource matched:** only used after gates, depth, routing, and shots have actually been measured;
-- **structure-conditioned:** current method uses only off-diagonal |Q_ij| scores;
+- **structure-conditioned:** the historical method in this Stage 1 plan used only off-diagonal |Q_ij| scores;
 - **learned policy:** future work, not Stage 1;
 - **trainability:** future mechanistic analysis, not a Stage 1 outcome.
 

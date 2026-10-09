@@ -6,7 +6,7 @@
 
 > **Can a transparent pre-optimization instance descriptor select a sparse constrained mixer topology that improves shallow variational optimization over structure-agnostic connected topologies, and under what conditions does that relationship fail?**
 
-The first descriptor tested is the magnitude of the off-diagonal QUBO interactions, `|Q_ij|`. It is a candidate heuristic, not a theoretically privileged quantity and not a validated algorithm.
+The historical first descriptor was the magnitude of off-diagonal QUBO interactions, `|Q_ij|`. The current mechanism candidate is exact fixed-cardinality conditional exchange RMS, with mean and variance retained separately. Neither low-RMS nor high-RMS selection has an established QAOA performance advantage.
 
 For a cardinality-constrained QUBO:
 
@@ -42,7 +42,7 @@ The structure rule lost to the ring on 17/24 instances. Its interaction-weight a
 
 This is treated as a **negative generalization result**, not as something to tune away.
 
-See [results/independent_dks_benchmark_v1.md](results/independent_dks_benchmark_v1.md) for the full exploratory analysis.
+Start with the [historical-results status note](results/README.md), which places the preserved pilot advancement decision in context. See [results/independent_dks_benchmark_v1.md](results/independent_dks_benchmark_v1.md) for the full exploratory analysis. No larger confirmatory benchmark is currently authorized or frozen.
 
 ## The important experimental correction
 
@@ -100,9 +100,11 @@ The strong-`|Q_ij|` rule has failed to generalize to the first independent famil
 
 The planned study compares historical strong/weak `|Q_ij|`, low/high conditional exchange RMS, shuffled controls, and random topology under all three initialization conditions. New mechanism-stage runs use the dimensionless coordinate `u = gamma * (C_max-C_min)` on `[0,2*pi]` for the grid and both local solvers; returned gamma is `u/(C_max-C_min)`. Centered, normalized costs remove objective-unit dependence from solver tolerances. This interval is a predeclared scale convention, not a fundamental period; the common beta interval `[0,pi]` is also a comparison convention. Historical pilot and independent DKS scripts explicitly retain `gamma_scale="legacy"`.
 
-Normalized costs use compensated summation of the represented QUBO coefficients, preventing cancellation noise from becoming an artificial landscape. Tiny resolved spans remain nonconstant without an absolute unit cutoff. If accurately summed costs are indistinguishable, `cost_status="constant_or_unresolved"` withholds normalized gap and optimum probability (`None`, JSON `null`, or blank CSV). A proven constant objective has optimum probability one; it is withheld here because constant and unresolved cases are intentionally combined. Raw legacy phases and expectations are unchanged. Historical summaries retain all raw rows and validate declared instance IDs, required comparators, and every summarized outcome, including optimum probability. Incomplete comparisons fail with affected/expected counts. The optimizer reports the selected candidate's source and status separately from each solver's status; `finite_objective` means only finite final expectation.
+Normalized costs use compensated summation of the represented QUBO coefficients, preventing cancellation noise from becoming an artificial landscape. Tiny resolved spans remain nonconstant without an absolute unit cutoff. For a resolved objective, `probability_optimum` sums probability only on states whose compensated float64 cost equals the minimum exactly, before normalization; it applies no near-optimum tolerance. Final cost rounding can still create numerical ties. If all accurately summed costs are indistinguishable, `cost_status="constant_or_unresolved"` withholds normalized gap and optimum probability (`None`, JSON `null`, or blank CSV). A proven constant objective has optimum probability one; it is withheld here because constant and unresolved cases are intentionally combined. Raw legacy phases and expectations are unchanged. Historical summaries retain all raw rows and validate declared instance IDs, required comparators, and every summarized outcome, including optimum probability. Incomplete comparisons fail with affected/expected counts. The optimizer reports the selected candidate's source and status separately from each solver's status; `finite_objective` means only finite final expectation.
 
-This repair makes no new performance claim. Scientific domain calibration, optimization-reference studies, and mechanism performance data remain future work.
+QUBO construction and exchange descriptors share an absolute symmetry check: `rtol=0`, `atol=1e-12`, without symmetrizing inputs. Exact descriptor identities assume symmetric `Q`; accepted small asymmetry is input tolerance, not a relative-accuracy guarantee for tiny objectives. Stored historical results are preserved; recomputing their probability metrics under minimum equality may change values previously obtained with the near-optimum mask.
+
+This repair makes no new performance claim. The next scientific phase is a small, predeclared gamma/beta-domain and optimizer calibration. Controlled mechanism comparisons follow calibration.
 
 The statistical sensitivity and pre-freeze machinery already in the repository is retained for reproducibility and later use. It is not the current scientific bottleneck, and no final sample-size or confirmatory-analysis claim is being made from the existing smoke runs.
 
@@ -115,10 +117,10 @@ python3 -m pip install -e .
 python3 -m unittest discover -s tests -v
 ```
 
-Exploratory pilot:
+Optional historical pilot reproduction, writing outside the preserved results:
 
 ```bash
-python3 experiments/run_pilot.py --instances 24 --n 8 --k 3
+python3 experiments/run_pilot.py --instances 24 --n 8 --k 3 --output /tmp/struct2circuit-pilot-reproduction
 ```
 
 Alignment control:

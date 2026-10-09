@@ -160,6 +160,7 @@ def summarize_pilot(results: pd.DataFrame, config: dict) -> dict:
             "one_sided_wilcoxon_p": wilcoxon_p,
         },
         "interpretation_rule": (
+            "Historical pilot screening rule, not current study authorization: "
             "Advance to the preregistered confirmatory study only if the paired median "
             "gap reduction is positive and its exploratory bootstrap interval does not "
             "contain zero. This pilot must not be reported as confirmatory evidence."
@@ -174,13 +175,18 @@ def write_report(summary: dict, output_path: Path) -> None:
     lo, hi = pair["median_gap_reduction_bootstrap_95_ci"]
     advances = pair["median_gap_reduction"] > 0 and lo > 0
     verdict = (
-        "The pilot clears the pre-specified advancement rule. A larger blind study is justified."
+        "The run clears the historical pilot screening rule. This does not authorize "
+        "a larger blind study; the later independent negative result and pending "
+        "numerical calibration determine the current research status."
         if advances else
-        "The pilot does not clear the advancement rule. The construction or hypothesis should be revised before scaling."
+        "The run does not clear the historical pilot screening rule. It supplies no "
+        "authorization for scaling the study."
     )
     text = f"""# Struct2Circuit pilot report
 
 **Status:** exploratory pilot; not confirmatory evidence and not a quantum-advantage claim.
+
+**Method:** historical strong-`|Q_ij|` heuristic. See the repository's `results/README.md` for current interpretation of the preserved pilot and independent benchmark. Recomputed probability metrics use the current minimum-equality semantics and may differ from stored historical values.
 
 ## Central claim under test
 
@@ -196,17 +202,17 @@ def write_report(summary: dict, output_path: Path) -> None:
 
 At the same mixer-edge budget, the ring median gap was **{by['ring']['median_normalized_gap']:.6f}** and the structure-conditioned median gap was **{by['structure']['median_normalized_gap']:.6f}**. The complete mixer used **{by['complete']['mixer_edges']}** edges, compared with **{by['ring']['mixer_edges']}** for both equal-budget mixers.
 
-## Decision
+## Historical screening decision
 
 {verdict}
 
 ## What this does not establish
 
-This small, noiseless, depth-one study does not establish generalization, hardware advantage, scaling advantage or superiority to tuned classical optimization. It is a software/invariant check and an effect-size estimate for the confirmatory design.
+This small, noiseless, depth-one study does not establish generalization, hardware advantage, scaling advantage or superiority to tuned classical optimization. It supplies an exploratory effect-size estimate for the historical configuration, not evidence for the current conditional-RMS candidate.
 
-## Next confirmatory milestone
+## Current next step
 
-Lock generator seeds before evaluation; include multiple structural regimes and at least one non-financial cardinality family; compare against XY-QAOA, warm-start and counterdiabatic baselines; incorporate cost-layer and transpilation resources; evaluate depths 1-3; and report the search cost required to construct each learned mixer.
+The next scientific phase is small, predeclared gamma/beta-domain and optimizer calibration. Controlled comparisons of low/high conditional exchange RMS follow calibration. These mixers are deterministic, not learned; no large confirmatory benchmark has been authorized or frozen.
 """
     output_path.write_text(text, encoding="utf-8")
 

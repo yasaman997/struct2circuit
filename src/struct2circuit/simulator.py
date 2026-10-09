@@ -18,6 +18,14 @@ ComplexArray = NDArray[np.complex128]
 
 @dataclass(frozen=True)
 class QAOAResult:
+    """QAOA outcomes for the declared numerical objective.
+
+    ``probability_optimum`` sums probability on exact minimum-equality states
+    of the compensated float64 feasible costs used for normalization. It has
+    no near-optimum tolerance; final cost-rounding ties remain numerical ties.
+    Constant or unresolved costs withhold both normalized metrics as ``None``.
+    """
+
     expectation: float
     normalized_gap: float | None
     probability_optimum: float | None
@@ -93,7 +101,10 @@ class FeasibleSubspaceQAOA:
             if self.feasible_span > 0.0 else None
         )
         self.optimal_mask = (
-            np.isclose(self.normalized_costs, 0.0, rtol=0.0, atol=1e-10)
+            # Compare before normalization: division can round a positive gap
+            # to zero. Equality here retains only minima of the same accurately
+            # summed float64 cost representation used for normalization.
+            normalization_costs == self.cost_min
             if self.normalized_costs is not None else np.zeros(len(self.costs), dtype=bool)
         )
         self.mixer_hamiltonian = xy_mixer_hamiltonian(self.basis, mixer)

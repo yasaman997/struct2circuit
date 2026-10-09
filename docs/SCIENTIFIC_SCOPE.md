@@ -1,21 +1,37 @@
 # Scientific scope and claim boundary
 
-Struct2Circuit currently studies one concrete intervention:
+Struct2Circuit currently studies a mechanistic candidate:
 
-> Use off-diagonal QUBO interaction magnitude |Q_ij| as side information when constructing a sparse, connected XY mixer for a cardinality-constrained QUBO.
+> Use the exact fixed-cardinality conditional RMS of feasible swap costs, derived from `Q`, `c`, and `k`, as side information when constructing a sparse, connected XY mixer under a fixed edge budget.
 
-The current method is deterministic and transparent.
+Conditional mean and variance are retained separately. Low-RMS and high-RMS edge selection are competing hypotheses; neither has yet demonstrated a QAOA performance improvement. The descriptor and topology construction are deterministic, and no learned policy is implemented.
 
-## Present-tense claims
+## Historical evidence
+
+The original strong-`|Q_ij|` heuristic beat the ring on 17/24 block-correlated pilot instances at the same 8-edge budget. The 28-edge complete mixer was a higher-edge-count reference. This was exploratory, family-specific evidence.
+
+On the first independent weighted densest-k-subgraph family, the same heuristic lost to the ring on 17/24 instances. That negative result is retained. Strong `|Q_ij|` is a historical comparator, not the primary current mechanism candidate or a generally validated method.
+
+The [historical-results status note](../results/README.md) explains why the original pilot report's advancement decision is preserved but is not current authorization for a larger blind benchmark.
+
+## Established mathematical and software results
 
 - The mixer preserves the fixed-Hamming-weight feasible subspace in the exact simulator.
-- The pilot compares an 8-edge structure-conditioned mixer with an 8-edge fixed ring.
-- The pilot also reports a 28-edge complete mixer as a higher-edge-count reference.
-- The pilot result is exploratory and family-specific.
+- The conditional exchange moments follow from uniform sampling of the remaining occupied variables at fixed `k`; exact enumeration provides a software check of that derivation. Floating-point range and rounding limitations remain explicit in the [mechanism document](MECHANISM_HYPOTHESIS.md).
+- The graph constructor preserves connectivity and its declared edge budget. Equal edge counts do not establish equal circuit or hardware resources.
+- The simulator exposes three initialization conditions: `uniform`, `mixer_low`, and `mixer_high`. With positive-sign XY exchange amplitudes, `mixer_high` has the Perron–Frobenius positive-amplitude interpretation for a connected mixer. The low extremum is a sensitivity control. Neither extremum guarantees better QAOA performance or efficient hardware preparation, and these comparisons do not isolate topology from initialization.
 
-## Future-tense questions
+These are mathematical and software properties, not performance evidence for the conditional-RMS candidate.
 
-- Does the effect survive independent problem families?
+## Untested hypotheses and next phase
+
+Numerical calibration is the next scientific phase. It must precede a mechanism-performance study; passing regression tests does not substitute for calibration. No large confirmatory benchmark has been authorized or frozen.
+
+The current questions are whether either RMS direction predicts useful mixer transitions, whether mean and variance help interpret any observed effect, and whether that effect survives all three initialization conditions and declared comparison controls.
+
+## Later questions
+
+- If an effect is established, does it survive independent problem families?
 - Does it survive unseen sizes and cardinality ratios?
 - Does it remain after measured transpilation and execution costs?
 - What mechanism explains any effect?
@@ -23,6 +39,8 @@ The current method is deterministic and transparent.
 - Is there any useful relationship between instance structure and variational optimization behavior?
 
 These questions are not presented as completed results.
+
+The project has not demonstrated quantum advantage, hardware advantage, learned architecture discovery, or improved trainability.
 
 ## Falsification
 

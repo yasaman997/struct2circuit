@@ -192,6 +192,13 @@ def exchange_profile_statistics(
     variance is 4*m*(N-m)/(N-1)*mean((a-mean(a))**2) for N > 1.
     The N <= 1 and endpoint-cardinality cases have zero variance.
 
+    These identities assume exactly symmetric Q. Validation shares
+    CardinalityQUBO's absolute tolerance of 1e-12 with no relative tolerance;
+    inputs are not symmetrized. For accepted asymmetry eps=max(abs(Q-Q.T)),
+    the formula's swap costs, conditional mean, and RMS can differ from those
+    of x.T@Q@x by up to 2*(k-1)*eps, apart from floating-point evaluation.
+    This is an absolute bound, not a relative guarantee for tiny objectives.
+
     For the mean, reduce 2*m/N to integers p/d and evaluate
     (d*d0 + p*sum(a[l]))/d. All original coefficients enter one compensated
     sum, with integer weights expressed as repeated terms; division follows

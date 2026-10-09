@@ -8,13 +8,15 @@ Struct2Circuit asks:
 
 > **Can a transparent pre-optimization instance descriptor select a sparse, feasibility-preserving mixer topology that improves shallow variational optimization over structure-agnostic connected topologies, and under what conditions does that relationship fail?**
 
-The first descriptor tested is off-diagonal interaction magnitude `|Q_ij|`. The first independent family did not support that rule as a generally useful heuristic.
+The historical first descriptor was off-diagonal interaction magnitude `|Q_ij|`. The first independent family did not support that rule as a generally useful heuristic. The current candidate is exact fixed-cardinality conditional exchange RMS, with low/high rankings treated as competing, unvalidated hypotheses.
 
 ## What the evidence says
 
 The original 24-instance block-correlated pilot favored the structure-conditioned mixer over the fixed ring on 17/24 instances.
 
 The first independent weighted densest-k-subgraph test reversed that pattern: the strong-`|Q_ij|` mixer lost to the ring on 17/24 instances and had the worst median normalized gap among the main three comparators.
+
+Read the [historical-results status note](results/README.md) before interpreting the preserved pilot report's original advancement decision. That decision is historical provenance, not current approval for a larger benchmark.
 
 The important result is therefore not “structure works.” It is:
 
@@ -62,11 +64,13 @@ The missing link is the transition-graph mechanism. See [docs/MECHANISM_HYPOTHES
 
 Do **not** start another large confirmatory benchmark yet.
 
+The next scientific phase is a small, predeclared gamma/beta-domain and optimizer calibration. Controlled mechanism comparisons follow it; no large confirmatory benchmark is authorized or frozen.
+
 The planned study compares historical strong/weak `|Q_ij|` with low/high exact conditional exchange RMS at fixed `k`, plus shuffled and random controls. Conditional mean and variance are retained separately; the former coefficient norm is no longer the primary descriptor. Low/high are competing hypotheses. All three initialization conditions are reported.
 
 New runs optimize `u = gamma * (C_max-C_min)` on `[0,2*pi]`, with centered normalized costs and identical bounds for the grid and both local solvers. Returned gamma remains in physical units. This gamma interval and the shared beta interval `[0,pi]` are declared comparison conventions, not universal periods. Both historical entry points explicitly retain `legacy` gamma semantics. No scientific domain calibration or new performance claim accompanies these repairs.
 
-Normalized costs use compensated coefficient summation without an absolute unit cutoff. If this cannot resolve distinct costs, the combined constant/unresolved status withholds normalized gap and optimum probability as JSON `null` or blank CSV. Optimum probability would be one for a proven constant; the combined policy intentionally does not make that distinction. Raw legacy arithmetic is preserved. All raw rows are retained, and summaries validate declared instance IDs, comparators, and every summarized outcome, including optimum probability; refusals report affected/expected counts. Alignment runs enforce the actual ring edge budget and record actual edge counts.
+Normalized costs use compensated coefficient summation without an absolute unit cutoff. For resolved objectives, optimum probability uses exact minimum equality of those float64 costs before normalization, with no near-optimum tolerance. Final cost rounding can still produce numerical ties. If no distinct costs remain, the combined constant/unresolved status withholds normalized gap and optimum probability as JSON `null` or blank CSV. Optimum probability would be one for a proven constant; the combined policy intentionally does not make that distinction. Raw legacy arithmetic is preserved. Recomputed probability metrics may differ from historical values; stored results are not rewritten. All raw rows are retained, and summaries validate declared instance IDs, comparators, and every summarized outcome, including optimum probability; refusals report affected/expected counts. Alignment runs enforce the actual ring edge budget and record actual edge counts.
 
 The repository already contains statistical sensitivity and pre-freeze infrastructure. Those tools remain available for a later confirmatory study; they are not the current scientific bottleneck.
 
@@ -75,6 +79,7 @@ The repository already contains statistical sensitivity and pre-freeze infrastru
 - `README.md` — project overview, current evidence, and claim boundary.
 - `docs/MECHANISM_HYPOTHESIS.md` — mechanism, controls, and falsification boundary.
 - `docs/LITERATURE_DIFFERENTIATION.md` — closest literature and precise scope.
+- `results/README.md` — current interpretation and preservation policy for historical results.
 - `results/independent_dks_benchmark_v1.md` — first independent benchmark result.
 - `experiments/run_alignment_control.py` — initialization/alignment control.
 - `src/struct2circuit/simulator.py` — exact feasible-subspace simulation and initialization modes.
@@ -89,10 +94,10 @@ python3 -m pip install -e .
 python3 -m unittest discover -s tests -v
 ```
 
-The existing pilot can be regenerated with:
+An optional reproduction of the historical pilot should write to a separate directory:
 
 ```bash
-python3 experiments/run_pilot.py --instances 24 --n 8 --k 3
+python3 experiments/run_pilot.py --instances 24 --n 8 --k 3 --output /tmp/struct2circuit-pilot-reproduction
 ```
 
 The alignment-control experiment is exploratory and uses a separate seed namespace:

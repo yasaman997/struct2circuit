@@ -64,7 +64,7 @@ This weakens the original strong-`|Q_ij|` hypothesis. It does not show that all 
 
 ## 6. Current falsification boundary
 
-The current strong-`|Q_ij|` rule should not be promoted to a general method unless it survives:
+The historical strong-`|Q_ij|` rule failed its first independent generalization check and remains a comparator. The current conditional-RMS candidate likewise must not be promoted to a general method without:
 
 - independent problem families;
 - initialization/alignment controls;
@@ -72,15 +72,23 @@ The current strong-`|Q_ij|` rule should not be promoted to a general method unle
 - weak/inverse/shuffled controls;
 - and a mechanistic analysis that identifies what transition-graph property is responsible.
 
-If those tests fail, the project should treat the strong-`|Q_ij|` mapping as a failed candidate and move to a different structural descriptor rather than tuning the same rule until it succeeds.
+The independent negative result is retained. Low- and high-RMS are untested competing hypotheses; null, mixed, or negative results must also be retained rather than choosing a direction after observing performance. Numerical calibration precedes these mechanism comparisons.
 
 ## 6A. Concrete transition-level mechanism candidate
 
-The next descriptor is derived from the exact feasible exchange-cost formula,
+The current descriptor is derived from the exact feasible exchange-cost formula,
 rather than generic interaction magnitude. For exchanging occupied i with
 unoccupied j,
 
 `Delta C_ij(x) = (Q_jj-Q_ii) + (c_j-c_i) + 2 sum_(l != i,j) x_l (Q_jl-Q_il)`.
+
+This identity assumes symmetric `Q`. Problem construction and descriptor evaluation
+both validate with `rtol=0`, `atol=1e-12` and leave coefficients unchanged. For
+accepted asymmetry `epsilon=max|Q-Q.T|`, the displayed expression can differ from
+the actual quadratic-cost swap by at most `2*(k-1)*epsilon`; mean and RMS inherit
+that absolute bound, apart from floating-point evaluation. The input tolerance
+does not promise relative accuracy for tiny objectives. All supplied generators
+produce symmetric matrices.
 
 Condition on uniformly sampled feasible states with `x_i=1`, `x_j=0`, and
 `sum(x)=k`. Write `N=n-2`, `m=k-1`, `d0=Q_jj-Q_ii+c_j-c_i`, and

@@ -27,19 +27,21 @@ It is not a claim to have invented constrained mixers, custom mixers, architectu
 
 The literature makes it unsafe to interpret every topology comparison as a pure topology effect. Different XY graphs can have different mixer ground spaces and dynamical structure, and alignment between an initial state and the mixer can affect low-depth performance.
 
-The original Struct2Circuit pilot used a uniform feasible state for every topology. That remains a valid fixed-initialization comparison, but it does not isolate topology from alignment. The simulator now exposes an explicit mixer-ground-state alignment control, and the next mechanistic experiment will report both initialization conditions.
+The original Struct2Circuit pilot used a uniform feasible state for every topology. That remains a valid fixed-initialization comparison, but it does not isolate topology from alignment. The simulator now exposes three explicit conditions: `uniform`, `mixer_low`, and `mixer_high`. The positive-sign XY Hamiltonian gives the highest mixer state the Perron–Frobenius positive-amplitude interpretation for connected mixers; `mixer_low` is an opposite-extremum sensitivity control. The spectral construction is deterministic, but its fallback in a degenerate eigenspace can depend on variable labels.
+
+These conditions diagnose sensitivity to the topology/initialization pairing. Neither extremum guarantees better optimization or supplies a hardware state-preparation claim, and reporting all three does not by itself isolate a pure topology effect. Numerical calibration comes next; no new performance result from these controls is established here.
 
 This is a correction to the experimental design, not a claim that the previous pilot was invalid.
 
 ## What the current evidence says
 
-The first independent weighted densest-k-subgraph benchmark did not reproduce the original pilot's positive result for the strong-`|Q_ij|` rule. This makes the current rule a **failed-to-generalize candidate heuristic**, not a validated algorithm.
+The strong-`|Q_ij|` rule beat the ring on 17/24 block-correlated pilot instances, then lost to the ring on 17/24 instances in the first independent weighted densest-k-subgraph benchmark. This makes that historical rule a **failed-to-generalize candidate heuristic**, not a validated algorithm. Both exploratory results remain preserved with their [historical status](../results/README.md).
 
 The useful scientific distinction is now:
 
 > high objective-interaction alignment is not equivalent to a useful shallow-QAOA mixer.
 
-The next question is whether another pre-optimization descriptor—such as interaction-profile similarity—captures information that the raw pairwise magnitude score misses, and whether any resulting effect survives initialization controls.
+The current candidate is the exact fixed-cardinality conditional exchange RMS derived from `Q`, `c`, and `k`, with conditional mean and variance retained separately. Low-RMS and high-RMS edge selection are competing hypotheses. The question is whether this descriptor captures useful information missed by raw pairwise magnitude, and whether any resulting effect survives the three initialization controls. Its mathematical derivation and software checks establish neither performance superiority nor novelty relative to the literature.
 
 ## Claim boundary
 
