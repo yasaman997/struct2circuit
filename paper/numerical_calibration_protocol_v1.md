@@ -828,4 +828,4 @@ score-tie label dependence remain explicit scientific interpretation limits.
   collisions in a direct extension of the original four-box formula.
 
 The original Stage 4A temporary proposal is preserved unchanged. This repository
-document is self-contained and remains PROPOSED — AWAITING SCIENTIFIC APPROVAL.
+document is self-contained and is APPROVED FOR CALIBRATION-DRIVER IMPLEMENTATION — CALIBRATION NOT EXECUTED.
