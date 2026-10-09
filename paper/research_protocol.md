@@ -179,8 +179,21 @@ exactly; summing them together avoids the cancellation error from separately
 rounded quadratic and linear totals. Derive `C_min`, `C_max`, and the span from
 these accurately summed costs, with no absolute raw-unit threshold. Raw costs,
 phases, and expectation arithmetic remain unchanged for legacy search.
-The gap uses normalized costs directly, and optimum classification uses tolerance
-`1e-10` in those dimensionless costs: a declared near-optimum convention.
+The gap uses normalized costs directly. For resolved, nonconstant costs,
+`probability_optimum` sums probability over states whose compensated float64 cost
+equals `C_min` exactly, before division by the span. No proximity tolerance is
+applied. Comparing normalized costs to zero would be insufficient: normalization
+can underflow a strictly positive gap to zero. The gap calculation itself is
+unchanged, so a zero normalized gap at extreme scales need not imply optimum
+probability one.
+
+This is minimum equality for the declared compensated-float64 objective, not
+exact rational minimization of the coefficient polynomial. Final cost rounding
+can merge distinct coefficient-level values into numerical ties, even when the
+overall span remains resolved. Recomputing historical probability metrics may
+therefore change values obtained under the former `1e-10` near-optimum mask;
+stored historical results and their reported conclusions are preserved. See
+[the historical-results status note](../results/README.md).
 
 If accurately summed costs still collapse to a zero span, retain the conservative
 `cost_status="constant_or_unresolved"`. This covers true constancy and variation
@@ -264,7 +277,7 @@ No baseline will be included merely because its name is impressive. It must be i
 
 The current method should be called a **structure-conditioned mixer generator**, not a general “architecture-search framework.”
 
-A future learned extension could replace `|Q_ij|` with a learned edge-scoring or architecture-selection policy. Before that experiment:
+A future learned extension could replace the declared deterministic descriptor with a learned edge-scoring or architecture-selection policy. Before that experiment:
 
 - the feature interface must be frozen;
 - every feature must be computable from the target instance before optimization;
@@ -403,7 +416,7 @@ The eventual paper should include a direct comparison table:
 | Prior-work capability | Present Struct2Circuit study |
 | --- | --- |
 | Feasibility-preserving constrained mixer | Yes, XY fixed-weight construction |
-| Problem-conditioned topology | Yes, `|Q_ij|`-conditioned graph |
+| Problem-conditioned topology | Historical strong-`\|Q_ij\|` interaction-magnitude heuristic; current candidate: exact fixed-cardinality conditional exchange RMS from `(Q, c, k)`. Low-RMS and high-RMS topologies are competing hypotheses; neither has demonstrated a performance advantage. |
 | Learned policy | **No, future extension** |
 | General architecture search | **No** |
 | Matched edge-budget study | **Current pilot / planned benchmark control** |
@@ -438,6 +451,6 @@ Do not state that the current method is novel merely because its components are 
 
 The present scientific contribution, if supported by future experiments, is:
 
-> **A controlled study of whether off-diagonal QUBO interaction structure can serve as side information for sparse, feasibility-preserving mixer design under a fixed edge budget.**
+> **A controlled study of whether exact fixed-cardinality conditional exchange RMS computed from `(Q, c, k)` can serve as side information for sparse, feasibility-preserving mixer design under a fixed edge budget, with the historical strong-`|Q_ij|` interaction-magnitude heuristic retained as a comparator. Low-RMS and high-RMS topologies are competing hypotheses; neither has demonstrated a performance advantage.**
 
 Learned policies, trainability mechanisms, hardware performance, broad architecture search, and quantum advantage remain separate research questions.
