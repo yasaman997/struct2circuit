@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict
+from contextlib import contextmanager
 from hashlib import sha256
 from pathlib import Path
 import json
@@ -16,11 +17,21 @@ from struct2circuit.calibration.budget import Budget, BudgetExhausted, Limits
 from struct2circuit.calibration.config import PROTOCOL_HASH, instance_specs
 from struct2circuit.calibration.decisions import Check
 from struct2circuit.calibration.driver import Case, PhaseDriver, generate_cases, require_execution_authorization, run_synthetic
+from struct2circuit.calibration.resources import GIB, MIB, ResourceGuard, ResourceExhausted
 from struct2circuit.calibration.storage import (ARTIFACTS, OutputStore, ValidationGate,
     canonical_json, create_validation_lock)
 from struct2circuit.mixers import ring_mixer
 from struct2circuit.problems import CardinalityQUBO
 from struct2circuit.simulator import FeasibleSubspaceQAOA
+
+
+@contextmanager
+def healthy_resource_guard():
+    """Keep entry-point safety tests independent of host resource discovery."""
+    with patch('struct2circuit.calibration.driver.ResourceGuard',
+               side_effect=lambda *args: ResourceGuard(*args, sample=lambda paths:
+                   (32*GIB, 30*GIB, 64*MIB, 10*GIB))):
+        yield
 
 
 def finalized_mock_development(directory, budget, *, policy=17, reserves=False, status='ACCEPTED WITH EXPLICIT LIMITATIONS'):
@@ -278,7 +289,8 @@ class WorkflowTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             out = Path(temporary)/'synthetic'
             limits = Limits(essential=8, shared=2, total=10, landscape=10, optional=1, cpu_seconds=10)
-            status, snapshot = run_synthetic([case], out, limits=limits, expected_keys=[case.key, (1043, 0, 0)])
+            with healthy_resource_guard():
+                status, snapshot = run_synthetic([case], out, limits=limits, expected_keys=[case.key, (1043, 0, 0)])
             self.assertEqual(status, 'INCONCLUSIVE')
             self.assertEqual(snapshot['counters']['actual_evaluations'], 10)
             rows = [json.loads(row) for row in (out/'landscapes.jsonl').read_text().splitlines()]
@@ -287,7 +299,7 @@ class WorkflowTests(unittest.TestCase):
 
     def test_constant_workflow_keeps_null_and_never_runs_solver(self):
         with tempfile.TemporaryDirectory() as temporary:
-            with patch('struct2circuit.calibration.reference.minimize', side_effect=AssertionError('No constant solver')):
+            with healthy_resource_guard(), patch('struct2circuit.calibration.reference.minimize', side_effect=AssertionError('No constant solver')):
                 status, snapshot = run_synthetic([self.fixture(True)], Path(temporary)/'synthetic', limits=Limits())
             self.assertEqual(status, 'INCONCLUSIVE')
             self.assertEqual(snapshot['counters'].get('actual_evaluations', 0), 0)
@@ -297,7 +309,8 @@ class WorkflowTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             out = Path(temporary)/'synthetic'
             limits = Limits(essential=60000, shared=10000, total=70000, landscape=70000, optional=10, cpu_seconds=30)
-            status, snapshot = run_synthetic([case], out, limits=limits, policies=(9,))
+            with healthy_resource_guard():
+                status, snapshot = run_synthetic([case], out, limits=limits, policies=(9,))
             rows = [json.loads(row) for row in (out/'landscapes.jsonl').read_text().splitlines()]
             self.assertEqual(len(rows), 1)
             self.assertEqual(set(rows[0]['references']) & {'B00', 'B10', 'B01', 'B11'}, {'B00', 'B10', 'B01', 'B11'})
@@ -405,7 +418,8 @@ class AdditionalSafetyTests(unittest.TestCase):
         case = WorkflowTests().fixture(constant=True)
         with tempfile.TemporaryDirectory() as temporary:
             output = Path(temporary)/'toy'
-            status, _ = run_synthetic([case], output, limits=Limits())
+            with healthy_resource_guard():
+                status, _ = run_synthetic([case], output, limits=Limits())
             self.assertEqual(json.loads((output/'calibration_manifest.json').read_text())['status'], status)
 
     def test_declared_pair_cannot_be_silently_omitted(self):
@@ -430,7 +444,7 @@ class AdditionalSafetyTests(unittest.TestCase):
             lock = root/'occupied-lock.json'
             lock.write_bytes(b'existing evidence')
             protocol = Path(__file__).resolve().parents[1]/'paper/numerical_calibration_protocol_v1.md'
-            with patch('struct2circuit.calibration.driver.generate_cases', side_effect=AssertionError('No official generation')):
+            with healthy_resource_guard(), patch('struct2circuit.calibration.driver.generate_cases', side_effect=AssertionError('No official generation')):
                 with self.assertRaises(FileExistsError): run_official_phase(root/'out', phase='development', authorization=auth, protocol=protocol, lock_output=lock)
             self.assertFalse((root/'out').exists())
             self.assertEqual(lock.read_bytes(), b'existing evidence')
@@ -893,6 +907,25 @@ class PendingTriggerRegressionTests(unittest.TestCase):
 
 
 class DevelopmentFinalizationRegressionTests(unittest.TestCase):
+    def test_entry_fixtures_work_without_cgroups_while_real_guard_rejects(self):
+        original_is_file = Path.is_file
+        def no_cgroups(path):
+            return False if str(path).startswith('/sys/fs/cgroup/') else original_is_file(path)
+        with tempfile.TemporaryDirectory() as temporary, patch.object(Path, 'is_file', new=no_cgroups):
+            root = Path(temporary)
+            budget = Budget()
+            with self.assertRaisesRegex(ResourceExhausted, 'Readable cgroup memory limits are required'):
+                ResourceGuard(root).check(budget, force=True)
+            self.assertEqual(budget.stop_reason, 'resource_information_unavailable')
+            with healthy_resource_guard():
+                status, snapshot = run_synthetic([WorkflowTests().fixture(constant=True)],
+                    root/'synthetic', limits=Limits())
+            self.assertEqual(status, 'INCONCLUSIVE')
+            self.assertEqual(snapshot['counters'].get('actual_evaluations', 0), 0)
+            self.assertEqual(self.official_mock(root), 'ACCEPTED WITH EXPLICIT LIMITATIONS')
+            # The test-local injection must not leak into subsequent admission.
+            with self.assertRaises(ResourceExhausted): ResourceGuard(root).check(force=True)
+
     def official_mock(self, root, *, interruption=None):
         """Exercise the real entry's finalization; all instance generation is mocked."""
         from types import SimpleNamespace
@@ -933,7 +966,7 @@ class DevelopmentFinalizationRegressionTests(unittest.TestCase):
             if name=='calibration_manifest.json' and kw.get('update_owned') and interruption=='before_manifest':
                 raise OSError('after decision before manifest')
             return original_json(store,name,value,**kw)
-        with patch('struct2circuit.calibration.driver.generate_cases',side_effect=mock_generate), \
+        with healthy_resource_guard(), patch('struct2circuit.calibration.driver.generate_cases',side_effect=mock_generate), \
              patch('struct2circuit.calibration.driver.PhaseDriver',new=MockCompletedPhase), \
              patch.object(OutputStore,'decision',new=decision),patch.object(OutputStore,'json',new=json_write):
             return run_official_phase(root/'development',phase='development',authorization=auth,
@@ -942,7 +975,7 @@ class DevelopmentFinalizationRegressionTests(unittest.TestCase):
     def assert_restart_blocked(self,root):
         from struct2circuit.calibration.driver import run_official_phase
         protocol=Path(__file__).resolve().parents[1]/'paper/numerical_calibration_protocol_v1.md'
-        with patch('struct2circuit.calibration.driver.generate_cases',side_effect=AssertionError('No approved generator')) as generate:
+        with healthy_resource_guard(), patch('struct2circuit.calibration.driver.generate_cases',side_effect=AssertionError('No approved generator')) as generate:
             with self.assertRaises((ValueError,FileNotFoundError,json.JSONDecodeError)):
                 run_official_phase(root/'validation',phase='validation',authorization=root/'auth.json',protocol=protocol,lock=root/'lock.json')
             self.assertFalse(generate.called)
@@ -984,10 +1017,10 @@ class DevelopmentFinalizationRegressionTests(unittest.TestCase):
             def generation(specs,budget,**kw):
                 kw['validation_gate'].begin_generation(kw['policy']);raise ReachedMockGenerator()
             protocol=Path(__file__).resolve().parents[1]/'paper/numerical_calibration_protocol_v1.md'
-            with patch('struct2circuit.calibration.driver.generate_cases',side_effect=generation):
+            with healthy_resource_guard(), patch('struct2circuit.calibration.driver.generate_cases',side_effect=generation):
                 with self.assertRaises(ReachedMockGenerator):
                     run_official_phase(root/'validation',phase='validation',authorization=root/'auth.json',protocol=protocol,lock=root/'lock.json')
-            with patch('struct2circuit.calibration.driver.generate_cases',side_effect=AssertionError('Second validation')) as generate:
+            with healthy_resource_guard(), patch('struct2circuit.calibration.driver.generate_cases',side_effect=AssertionError('Second validation')) as generate:
                 with self.assertRaises(FileExistsError):
                     run_official_phase(root/'second',phase='validation',authorization=root/'auth.json',protocol=protocol,lock=root/'lock.json')
                 self.assertFalse(generate.called)
