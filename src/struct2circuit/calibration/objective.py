@@ -49,6 +49,13 @@ class Objective:
                                    np.asarray(simulator.normalized_costs if simulator.normalized_costs is not None else [], dtype=float))
         self.identity += ':'+str(landscape)+':compensated-normalized-p1-v1'
         self.last = None
+        self.released = False
+
+    def release_cache(self):
+        """Terminal disposal only: subsequent numerical work is an error."""
+        self.cache.clear()
+        self.last = None
+        self.released = True
 
     def key(self, u, beta):
         if not np.isfinite([u, beta]).all():
@@ -56,6 +63,8 @@ class Objective:
         return self.identity, pack('>dd', float(u), float(beta))
 
     def evaluate(self, u, beta, domain="B00", *, fresh=False):
+        if self.released:
+            raise RuntimeError('Numerical work attempted after terminal cache release')
         key = self.key(u, beta)
         self.budget.request(self.landscape, domain)
         if not fresh and key in self.cache:

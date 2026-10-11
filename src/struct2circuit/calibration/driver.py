@@ -22,6 +22,7 @@ from .diagnostics import (direct_oracle, gradient_check, invariance_checks, reus
                           spectral_coordinates, spectral_diagnostics)
 from .objective import Objective, array_hash, production_search
 from .reference import Candidate, ReferenceSearch
+from .resources import ResourceGuard, ResourceExhausted
 from .storage import (OutputStore, ValidationGate, create_validation_lock, driver_identity,
                       provenance, preflight_validation_lock, ARTIFACTS, PAIR_FIELDS)
 
@@ -412,8 +413,13 @@ class PhaseDriver:
         # Pending work can never pass, even if a backend did not advance flags.
         # This bound protects against malformed callbacks as well as regressions.
 
-    def checks(self, policy):
+    def checks(self, policy, *, observe=None):
         checks, expected = [], []
+        def append(check):
+            # Observe before list allocation; terminal reporting can retain a
+            # completed failure even if a later check cannot be constructed.
+            if observe is not None: observe(check)
+            checks.append(check)
         for key in self.expected_keys:
             case = next((c for c in self.cases if c.key == key), None)
             result = self.results.get(case.canonical_key) if case else None
@@ -421,7 +427,7 @@ class PhaseDriver:
             def add(name, status, essential=True):
                 full = prefix+':'+name
                 expected.append(full)
-                checks.append(Check(full, status, essential))
+                append(Check(full, status, essential))
             if result is None:
                 add('landscape', 'missing')
                 continue
@@ -455,13 +461,13 @@ class PhaseDriver:
         for pair in self.pairs:
             if pair['policy'] == policy:
                 name = f"pair:{pair['instance_id']}:{pair['initialization_id']}:{pair['i']}:{pair['j']}"
-                checks.append(Check(name, pair['status']))
+                append(Check(name, pair['status']))
             elif pair['policy'] is None and pair['status'] == 'reversal':
-                checks.append(Check(f"rank:{pair['instance_id']}:{pair['initialization_id']}:{pair['i']}:{pair['j']}:{pair['domains']}", 'fail', self.broader_essential))
+                append(Check(f"rank:{pair['instance_id']}:{pair['initialization_id']}:{pair['i']}:{pair['j']}:{pair['domains']}", 'fail', self.broader_essential))
         expected.append('resource_completion')
-        checks.append(Check('resource_completion', 'unresolved' if self.budget.stop_reason and not self.budget.mandatory_complete else 'pass'))
+        append(Check('resource_completion', 'unresolved' if self.budget.stop_reason and not self.budget.mandatory_complete else 'pass'))
         for i, message in enumerate(self.phase_failures):
-            checks.append(Check(f'phase_failure:{i}:{message}', 'fail'))
+            append(Check(f'phase_failure:{i}:{message}', 'fail'))
         return checks, expected
 
     def status(self, policy):
@@ -470,6 +476,8 @@ class PhaseDriver:
         return classify(checks, expected, optional_complete=False)
 
     def run(self):
+        if any(r.objective.released for r in self.results.values()):
+            raise RuntimeError('Cannot resume a phase after terminal reporting')
         if self.gate and self.policies != self.validation_policies:
             raise ValueError('Validation policy configuration was altered')
         for case in sorted(self.cases, key=lambda c: (c.initialization_id, c.graph_id, c.instance_id)):
@@ -490,6 +498,8 @@ class PhaseDriver:
         return self
 
     def add_policy(self, policy):
+        if any(r.objective.released for r in self.results.values()):
+            raise RuntimeError('Cannot add a policy after terminal reporting')
         if self.gate: raise ValueError('Cannot retune policies after validation begins')
         if policy not in (9, 17, 33): raise ValueError('Unknown policy')
         if policy in self.policies: return
@@ -511,6 +521,12 @@ class PhaseDriver:
     def write_results(self, policy, *, final_status=None):
         if final_status not in (None, 'FAILED', 'INCONCLUSIVE'):
             raise ValueError('A reporting override may only preserve failure or incompleteness')
+        # Reporting is terminal. Refinements, policy selection and reserve work
+        # have finished; references and controls retain all required evidence.
+        for result in self.results.values():
+            result.objective.release_cache()
+        if self.budget.resource_guard is not None:
+            self.budget.resource_guard.check(self.budget, force=True)
         if self.gate: self.gate.authorize(policy)
         for case in self.cases:
             result = self.results.get(case.canonical_key)
@@ -618,8 +634,52 @@ class PhaseDriver:
         return statistics, best_sets
 
 
+def _report_resource_stop(store, budget, error, driver, phase, *, policy):
+    """Small terminal evidence when headroom cannot support full reporting.
+
+    The budget artifact remains unfinished; no validation capability is issued.
+    Previously flushed failure controls are retained in candidates.jsonl.
+    """
+    failed = bool(driver and (driver.phase_failures or any(
+        r.arithmetic_failure or any(c['status'] == 'fail' for c in r.controls)
+        for r in driver.results.values())))
+    failed_checks, truncated, inspection_incomplete = [], False, False
+    def observe(check):
+        # Local to this terminal assessment: no persistent provisional or
+        # diagnostic-policy failure latch is added to PhaseDriver.
+        nonlocal failed, truncated
+        if check.essential and check.status == 'fail':
+            failed = True
+            if len(failed_checks) < 64:
+                failed_checks.append(check.name)
+            else:
+                truncated = True
+    if driver:
+        for result in driver.results.values(): result.objective.release_cache()
+        try:
+            # These classifications use completed records, not numerical work or
+            # exact-key snapshots. Do not authorize/hash a validation lock here.
+            driver.checks(policy, observe=observe)
+        except MemoryError:
+            # Preserve latched failures without inventing unresolved comparisons.
+            inspection_incomplete = True
+    budget.mandatory_complete = False
+    status = 'FAILED' if failed else 'INCONCLUSIVE'
+    store.json('calibration_manifest.json', dict(phase=phase, status=status, error=str(error),
+        protocol_sha256=PROTOCOL_HASH, development_finalized=False, validation_completed=False,
+        reporting_complete=False, stop_reason=budget.stop_reason, selected_policy=policy,
+        failed_checks=failed_checks, failed_checks_truncated=truncated,
+        failure_inspection_incomplete=inspection_incomplete), update_owned=True)
+    store.decision(status+'\n'+str(error)+f'\nPolicy: P{policy}. Failed essential checks: {json.dumps(failed_checks)}.'
+        +f'\nFailed-check list truncated: {truncated}. Failure inspection incomplete: {inspection_incomplete}.'
+        +'\nFull budget/evidence reporting is incomplete; no validation lock issued.')
+    return status
+
+
 def run_synthetic(cases, output, *, limits, expected_keys=None, policies=(9, 17)):
     budget = Budget(limits)
+    budget.resource_guard = ResourceGuard(output)
+    budget.resource_guard.check(budget, force=True)
     keys = [c.key for c in cases] if expected_keys is None else expected_keys
     with OutputStore(output) as store:
         manifest = dict(kind='SYNTHETIC_IMPLEMENTATION_CHECK', expected_keys=keys, status='RUNNING',
@@ -628,7 +688,11 @@ def run_synthetic(cases, output, *, limits, expected_keys=None, policies=(9, 17)
         for instance_id in sorted({c.instance_id for c in cases}):
             store.row('instances.jsonl', dict(instance_id=instance_id, split='synthetic', official=False))
         phase = PhaseDriver(cases, budget, store, expected_keys=keys, policies=policies, synthetic=True).run()
-        status = phase.write_results(policies[-1])
+        try:
+            status = phase.write_results(policies[-1])
+        except ResourceExhausted as error:
+            _report_resource_stop(store, budget, error, phase, 'synthetic', policy=policies[-1])
+            raise  # do not allocate a full snapshot without reporting headroom
         store.json('calibration_manifest.json', manifest | dict(status=status), update_owned=True)
     return status, budget.snapshot()
 
@@ -639,6 +703,9 @@ def run_official_phase(output, *, phase, authorization, protocol, lock=None, loc
         raise ValueError('Official phase must be development or validation')
     verify_protocol(protocol)
     require_execution_authorization(authorization, phase)
+    guard = ResourceGuard(output, lock_output or lock)
+    # Admit even the lock-loading peak before constructing a ValidationGate.
+    guard.check(force=True, extra_memory=8*Path(lock).stat().st_size if phase == 'validation' and lock else 0)
     seed_metadata = verify_public_seed_metadata(Path(__file__).resolve().parents[3])
     gate = ValidationGate(lock) if phase == 'validation' and lock else None
     if phase == 'validation' and gate is None:
@@ -646,6 +713,8 @@ def run_official_phase(output, *, phase, authorization, protocol, lock=None, loc
     if gate:
         preflight_validation_lock(gate.path.with_name(gate.path.name+'.validation-started'))
     budget = Budget.from_snapshot(gate.payload['budget']) if gate else Budget()
+    budget.resource_guard = guard
+    guard.check(budget, force=True)
     reserves = gate.payload['reserves_active'] if gate else False
     policy = gate.payload['policy'] if gate else 17
     specs = tuple(s for s in instance_specs(reserves) if (s.split == 'validation') == (phase == 'validation'))
@@ -704,10 +773,15 @@ def run_official_phase(output, *, phase, authorization, protocol, lock=None, loc
                             development_finalized=not gate and budget.mandatory_complete)
             store.json('calibration_manifest.json', manifest, update_owned=True)
             store.sync()
+        except ResourceExhausted as error:
+            return _report_resource_stop(store, budget, error, driver, phase, policy=policy)
         except (BudgetExhausted, ArithmeticError, ValueError) as error:
             if driver:
                 if not isinstance(error, BudgetExhausted): driver.phase_failures.append(str(error))
-                status = driver.write_results(policy, final_status='INCONCLUSIVE' if isinstance(error, BudgetExhausted) else 'FAILED')
+                try:
+                    status = driver.write_results(policy, final_status='INCONCLUSIVE' if isinstance(error, BudgetExhausted) else 'FAILED')
+                except ResourceExhausted as resource_error:
+                    return _report_resource_stop(store, budget, resource_error, driver, phase, policy=policy)
                 store.json('calibration_manifest.json', manifest | dict(status=status, error=str(error), expected_phase_keys=driver.expected_keys), update_owned=True)
                 return status
             for key in expected: store.row('landscapes.jsonl', dict(landscape=key, status='missing', error=str(error), normalized_gap=None))

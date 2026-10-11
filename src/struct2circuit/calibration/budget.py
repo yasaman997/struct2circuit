@@ -39,6 +39,7 @@ class Budget:
         self.unique = set()
         self.stop_reason = None
         self.mandatory_complete = False
+        self.resource_guard = None
 
     def check_time(self):
         if self.stop_reason:
@@ -46,6 +47,8 @@ class Budget:
         if self.prior_cpu+self.cpu_clock()-self.cpu_start >= self.limits.cpu_seconds:
             self.stop_reason = "cpu_ceiling"
             raise BudgetExhausted(self.stop_reason)
+        if self.resource_guard is not None:
+            self.resource_guard.check(self)
 
     def request(self, landscape, domain):
         self.counts['objective_requests'] += 1
@@ -99,7 +102,9 @@ class Budget:
         budget.landscapes.update(snapshot['per_landscape'])
         for row in snapshot['per_domain']:
             budget.domains[(row['landscape'], row['domain'], row['counter'])] = row['count']
-        budget.unique = {(identity, bytes.fromhex(coordinates)) for identity, coordinates in snapshot['unique_keys']}
+        identities = {}
+        budget.unique = {(identities.setdefault(identity, identity), bytes.fromhex(coordinates))
+                         for identity, coordinates in snapshot['unique_keys']}
         budget.prior_cpu = snapshot['cpu_seconds']
         budget.prior_wall = snapshot['wall_seconds']
         if (any(type(v) is not int or v < 0 for v in (*budget.counts.values(), *budget.landscapes.values(), *budget.domains.values()))
