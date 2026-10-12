@@ -44,6 +44,49 @@ def canonical_json(value):
     return json.dumps(clean(value), sort_keys=True, separators=(',', ':'), allow_nan=False)
 
 
+def canonical_chunks(value):
+    """The canonical_json byte contract, without copying large containers."""
+    if is_dataclass(value): value = asdict(value)
+    if isinstance(value, np.ndarray): value = value.tolist()
+    if isinstance(value, np.generic): value = value.item()
+    if isinstance(value, dict):
+        values = {str(k): v for k, v in value.items()}
+        yield '{'
+        for i, key in enumerate(sorted(values)):
+            if i: yield ','
+            yield json.dumps(key)
+            yield ':'
+            yield from canonical_chunks(values[key])
+        yield '}'
+    elif isinstance(value, (tuple, list, set)):
+        yield '['
+        for i, item in enumerate(value):
+            if i: yield ','
+            yield from canonical_chunks(item)
+        yield ']'
+    else:
+        if isinstance(value, float) and not math.isfinite(value): value = None
+        yield json.dumps(value, separators=(',', ':'), allow_nan=False)
+
+
+def canonical_hash(value):
+    digest = sha256()
+    for chunk in canonical_chunks(value): digest.update(chunk.encode())
+    return digest.hexdigest()
+
+
+def write_canonical(handle, value):
+    # Bounded batching avoids one write per scalar without building full JSON.
+    chunks, size = [], 0
+    for chunk in canonical_chunks(value):
+        chunks.append(chunk)
+        size += len(chunk)
+        if size >= 65536:
+            handle.write(''.join(chunks))
+            chunks, size = [], 0
+    handle.write(''.join(chunks)+'\n')
+
+
 def driver_identity():
     root = Path(__file__).resolve().parent
     digest = sha256()
@@ -104,7 +147,7 @@ class OutputStore:
                 raise ValueError('Only the currently owned manifest may be finalized')
             handle.seek(0)
             handle.truncate()
-        handle.write(canonical_json(value)+'\n')
+        write_canonical(handle, value)
         handle.flush()
 
     def row(self, name, value):
@@ -186,7 +229,7 @@ def _development_evidence(directory, payload, *, expected_hashes=None):
     persisted = json.loads((directory/'budget.json').read_text())
     if (not persisted.get('mandatory_complete') or persisted.get('stop_reason')
         or persisted.get('incomplete_required_work') != []
-        or any(canonical_json(persisted.get(k)) != canonical_json(payload['budget'][k])
+        or any(canonical_hash(persisted.get(k)) != canonical_hash(payload['budget'][k])
                for k in ('limits', 'counters', 'per_landscape', 'per_domain', 'unique_keys'))):
         raise ValueError('Development budget or mandatory work is incomplete')
     Budget.from_snapshot(persisted)
@@ -234,7 +277,7 @@ def create_validation_lock(path, *, policy, scope, reserves, budget, development
     payload['development_evidence'] = _development_evidence(development_output, payload)
     budget.check_time()
     payload['budget'] = budget.snapshot()
-    document = dict(payload=payload, sha256=sha256(canonical_json(payload).encode()).hexdigest())
+    document = dict(payload=payload, sha256=canonical_hash(payload))
     path = preflight_validation_lock(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     # Publish a fully synced file atomically and exclusively. A crash while
@@ -244,9 +287,14 @@ def create_validation_lock(path, *, policy, scope, reserves, budget, development
         with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', dir=path.parent,
                                          prefix=path.name+'.', suffix='.tmp', delete=False) as handle:
             temporary = Path(handle.name)
-            handle.write(canonical_json(document)+'\n')
+            write_canonical(handle, document)
             handle.flush()
             os.fsync(handle.fileno())
+        # Streaming/hash/fsync work also consumes time and disk. Check again
+        # before the atomic publication can expose a usable capability.
+        if budget.resource_guard is not None:
+            budget.resource_guard.check(budget, force=True)
+        budget.check_time()
         os.link(temporary, path)
         _sync_directory(path.parent)
     finally:
@@ -261,8 +309,15 @@ class ValidationGate:
         self.bytes = self.path.read_bytes()
         document = json.loads(self.bytes)
         payload = document['payload']
-        if document['sha256'] != sha256(canonical_json(payload).encode()).hexdigest():
+        if document['sha256'] != canonical_hash(payload):
             raise ValueError('Validation lock checksum mismatch')
+        self._payload_hash = document['sha256']
+        self._bytes_hash = sha256(self.bytes).hexdigest()
+        # JSON repeats equal model identities. Share their immutable strings;
+        # canonical bytes and key values remain unchanged.
+        identities = {}
+        for row in payload.get('budget', {}).get('unique_keys', ()):
+            row[0] = identities.setdefault(row[0], row[0])
         expected_manifest = build_manifest(payload.get('reserves_active', False))
         if (payload.get('protocol_sha256') != PROTOCOL_HASH or payload.get('thresholds') != THRESHOLDS
             or payload.get('domain') != 'B00' or payload.get('policy') not in (9, 17, 33)
@@ -287,7 +342,10 @@ class ValidationGate:
         self.generation_claimed = True
 
     def authorize(self, policy):
-        if self.path.read_bytes() != self.bytes or canonical_json(self.payload) != canonical_json(json.loads(self.bytes)['payload']):
+        with self.path.open('rb') as handle:
+            file_hash = sha256_file(handle)
+        if (file_hash != self._bytes_hash or sha256(self.bytes).hexdigest() != self._bytes_hash
+            or canonical_hash(self.payload) != self._payload_hash):
             raise ValueError('Validation lock was altered')
         if policy != self.payload['policy']:
             raise ValueError('Production policy substitution prohibited')

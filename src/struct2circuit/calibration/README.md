@@ -87,3 +87,19 @@ retained candidates and persisted unique keys can be substantial. Independent
 Stage 5B review should challenge route independence, face/cut completeness,
 refinement/F accounting, scheduling/accounts, reserve activation, lock/policy
 barriers, output truthfulness and memory/runtime practicality before execution.
+
+Reporting is terminal: `write_results` releases cached states and `last` only
+after refinement, reserve activation and policy work. Subsequent numerical work
+on that phase is rejected. References, controls and exact budget keys remain.
+Budget/lock JSON uses the existing canonical bytes and schema, with bounded
+serialization buffers and streaming integrity hashes.
+
+Execution admission and monitoring require readable Linux host/cgroup memory
+and output-filesystem capacity. Operational checks use the smaller of 24 GiB
+and 75% of effective RAM, reserving 512 MiB plus 1,100 bytes per cumulative key
+for finalization; disk reserves 512 MiB plus 512 bytes per key. Samples occur
+every second or 256 requests, and before reporting. Resource stops leave work
+`INCONCLUSIVE`, with completed numerical failures taking precedence. These
+hardware safeguards are separate from scientific thresholds and cannot prevent
+all native allocation spikes or competing-process exhaustion. Official execution
+still requires separate authorization and independent resource-safety review.
