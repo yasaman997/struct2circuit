@@ -12,7 +12,8 @@ from ..calibration.decisions import (GAIN, agreement, band, challenge_required, 
 from ..calibration.diagnostics import direct_oracle
 from ..calibration.driver import Case, CaseResult
 from ..calibration.objective import Objective, array_hash
-from ..calibration.reference import Candidate, ReferenceResult, ReferenceSearch
+from ..calibration.reference import Candidate, ReferenceResult
+from .reference import ReferenceSearch
 from ..calibration.storage import OutputStore
 from ..mixers import MixerSpec
 from ..problems import CardinalityQUBO
@@ -139,13 +140,16 @@ class DiagnosticDriver:
         try:
             native=result.objective.evaluate(*candidate.point,'B00',fresh=True)
             def record(c):
+                c=dict(c,objective_identity=result.objective.identity)
                 event.update(oracle=c)
                 if c['status']=='fail':event['shared_failure']=True
             check=direct_oracle(result.objective,candidate.point,record_callback=record)
+            check=dict(check,objective_identity=result.objective.identity)
             event.update(oracle=check,reliable=check['status']=='pass' and abs(native.gap-candidate.value)<=1e-10)
             result.controls.append(check)
             result.controls.append(dict(kind='candidate_reevaluation',point=candidate.point,domain='B00',
-                error=abs(native.gap-candidate.value),status='pass' if abs(native.gap-candidate.value)<=1e-10 else 'fail'))
+                objective_identity=result.objective.identity,error=abs(native.gap-candidate.value),
+                status='pass' if abs(native.gap-candidate.value)<=1e-10 else 'fail'))
             if not event['reliable']:
                 event['shared_failure']=True;return
             result.search._pool(core,v1.BY_NAME['B00'],(candidate,))
@@ -247,11 +251,13 @@ def run_diagnostics(output,*,development,validation,resource,lock,authorization,
     if hashes!=auth['core_artifact_hashes']:raise PermissionError('Diagnostic core identities do not match authorization')
     m=json.loads((Path(validation)/'calibration_manifest.json').read_text())
     if m.get('validation_lock_sha256')!=gate.bytes_hash:raise ValueError('Validation used a different lock')
-    b=Budget.from_snapshot(current_snapshot(validation,resource),phase='diagnostics',cpu_origin=cpu_origin)
+    b=Budget.from_snapshot(current_snapshot(validation,resource,expected_prior=gate.current_budget()),
+        phase='diagnostics',cpu_origin=cpu_origin)
     from ..calibration.resources import ResourceGuard
     b.resource_guard=ResourceGuard(output);b.resource_guard.check(b,force=True)
     from ..calibration.storage import preflight_validation_lock
-    for p in (str(output)+'.resources.json',str(output)+'.resources.json.process-ended.json'):
+    for p in (str(output)+'.resources.json',str(output)+'.resources.json.process-ended.json',
+              str(output)+'.resources.json.process-ended.json.settled.json'):
         preflight_validation_lock(p)
     with OutputStore(output) as store:
         store.json('calibration_manifest.json',manifest()|dict(phase='diagnostics',core_artifacts=hashes,authorization=auth,status='RUNNING'))
@@ -267,6 +273,7 @@ def run_diagnostics(output,*,development,validation,resource,lock,authorization,
             for case in cases:
                 r=results[case.canonical_key]
                 rows.append(dict(landscape=case.key,canonical=case.canonical_key,status='observed',audit=case.audit,
+                    objective_identity=r.objective.identity,
                     width=float(np.ptp(case.simulator._mixer_eigenvalues)),production={str(n):asdict(c) for n,c in r.production.items()},
                     references={'B00':r.references['B00'].record()},controls=r.controls,synthetic=False,error=r.error))
             recalculated=assess(rows,[c.key for c in cases])[0]

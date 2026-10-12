@@ -3,6 +3,8 @@ from dataclasses import asdict, replace
 from pathlib import Path
 from struct import pack
 import json
+import os
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -23,7 +25,8 @@ from struct2circuit.calibration_v2.config import PROTOCOL_HASH, expected_keys, e
 from struct2circuit.calibration_v2.driver import PhaseDriver, generate_cases
 from struct2circuit.calibration_v2.evidence import classify, reference_values, assess, required_work
 from struct2circuit.calibration_v2.storage import (ValidationGate, atomic_json, authorize, finish_resources,
-    seal_process, current_snapshot, verify_evidence, create_lock, runtime_identity, require_official_runtime)
+    seal_process, settle_process, settle_publication, current_snapshot, verify_evidence, create_lock,
+    runtime_identity, require_official_runtime)
 from struct2circuit.calibration_v2.diagnostics import contradiction_status, addendum, DiagnosticDriver
 from struct2circuit.mixers import ring_mixer
 from struct2circuit.problems import CardinalityQUBO
@@ -119,6 +122,145 @@ class BudgetTests(unittest.TestCase):
         with self.assertRaises(ValueError):self.charge(self.make(),0,optional=True)
         s=self.make().snapshot()
         with self.assertRaises(ValueError):Budget.from_snapshot(s,phase='diagnostics')
+
+
+class ResourceChainRepairTests(unittest.TestCase):
+    def receipt(self,root,name,budget,previous=None,cpu=1.):
+        p=root/name;p.mkdir()
+        (p/'budget.json').write_text(canonical_json(budget.snapshot()))
+        r=finish_resources(p,budget,budget.phase,previous=previous)
+        receipt=seal_process(r,process_cpu_seconds=cpu,prior_cpu=budget.prior_cpu)
+        # Before the repair the raw cutoff is exposed directly. After the repair
+        # the OS-observed phase-exit settlement is required before exposure.
+        from struct2circuit.calibration_v2 import storage
+        if hasattr(storage,'settle_process'):
+            storage.settle_process(receipt,process_cpu_seconds=cpu)
+        return p,receipt
+
+    def test_self_consistent_reset_validation_ledger_rejected(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary);dev=Budget();dev.mandatory_complete=True
+            dev.request('toy','B00');dev.charge(('model',pack('>dd',.2,.3)),'toy','B00')
+            _,prior=self.receipt(root,'development',dev)
+            val=Budget(phase='validation');val.prior_cpu=1.;val.prior_wall=dev.snapshot()['wall_seconds'];val.mandatory_complete=True
+            with self.assertRaises(ValueError):
+                core,receipt=self.receipt(root,'validation',val,previous=prior)
+                current_snapshot(core,receipt)
+
+    def test_domain_request_counter_reset_rejected(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary);dev=Budget();dev.mandatory_complete=True
+            dev.request('toy','B00');dev.charge(('model',pack('>dd',.2,.3)),'toy','B00')
+            _,prior=self.receipt(root,'development',dev)
+            s=dev.snapshot();s['cpu_seconds']=1.
+            val=Budget.from_snapshot(s,phase='validation');val.mandatory_complete=True
+            val.domains['toy','B00','requests']=0
+            with self.assertRaises(ValueError):
+                core,receipt=self.receipt(root,'validation',val,previous=prior)
+                current_snapshot(core,receipt)
+
+    def test_phase_reassignment_rejected_even_with_same_total(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary);dev=Budget();dev.mandatory_complete=True
+            dev.request('toy','B00');dev.charge(('model',pack('>dd',.2,.3)),'toy','B00')
+            _,prior=self.receipt(root,'development',dev)
+            s=dev.snapshot();s['cpu_seconds']=1.
+            val=Budget.from_snapshot(s,phase='validation');val.mandatory_complete=True
+            val.phases=dict(development=0,validation=1,diagnostics=0)
+            with self.assertRaises(ValueError):
+                core,receipt=self.receipt(root,'validation',val,previous=prior)
+                current_snapshot(core,receipt)
+
+    def test_landscape_and_actual_domain_reassignment_rejected(self):
+        for field in ('landscape','domain'):
+            with self.subTest(field=field),tempfile.TemporaryDirectory() as temporary:
+                root=Path(temporary);dev=Budget();dev.mandatory_complete=True
+                dev.request('toy','B00');dev.charge(('model',pack('>dd',.2,.3)),'toy','B00')
+                _,prior=self.receipt(root,'development',dev)
+                s=dev.snapshot();s['cpu_seconds']=1.
+                val=Budget.from_snapshot(s,phase='validation');val.mandatory_complete=True
+                if field=='landscape':val.landscapes.clear();val.landscapes['other']=1
+                else:
+                    val.domains['toy','B00','actual']=0;val.domains['toy','B10','actual']=1
+                with self.assertRaises(ValueError):
+                    core,receipt=self.receipt(root,'validation',val,previous=prior)
+                    current_snapshot(core,receipt)
+
+    def test_valid_three_phase_chain_and_diagnostics_reset(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary);dev=Budget();dev.mandatory_complete=True
+            dev.request('toy','B00');dev.charge(('model',pack('>dd',.2,.3)),'toy','B00')
+            devcore,devreceipt=self.receipt(root,'development',dev)
+            val=Budget.from_snapshot(current_snapshot(devcore,devreceipt),phase='validation');val.mandatory_complete=True
+            val.request('validation-toy','B00');val.charge(('val-model',pack('>dd',.2,.3)),'validation-toy','B00')
+            valcore,valreceipt=self.receipt(root,'validation',val,previous=devreceipt)
+            diag=Budget.from_snapshot(current_snapshot(valcore,valreceipt),phase='diagnostics');diag.mandatory_complete=True
+            diag.request('toy','B10');diag.charge(('model',pack('>dd',.4,.3)),'toy','B10',optional=True)
+            core,receipt=self.receipt(root,'diagnostics',diag,previous=valreceipt)
+            snap=current_snapshot(core,receipt)
+            self.assertEqual(snap['phases'],dict(development=1,validation=1,diagnostics=1))
+            self.assertEqual(snap['counters']['actual_evaluations'],3)
+            bad=Budget(phase='diagnostics');bad.prior_cpu=snap['cpu_seconds'];bad.prior_wall=snap['wall_seconds'];bad.mandatory_complete=True
+            with self.assertRaises(ValueError):self.receipt(root,'reset-diagnostics',bad,previous=valreceipt)
+
+    def test_later_phase_cannot_discard_prior_receipt(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            with self.assertRaises(ValueError):self.receipt(Path(temporary),'validation',Budget(phase='validation'))
+
+    def test_unsettled_phase_cannot_expose_grant(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            p=Path(temporary)/'core';p.mkdir();b=Budget();b.mandatory_complete=True
+            (p/'budget.json').write_text(canonical_json(b.snapshot()))
+            r=finish_resources(p,b,'development');receipt=seal_process(r,process_cpu_seconds=1.)
+            with self.assertRaises((ValueError,FileNotFoundError)):current_snapshot(p,receipt)
+            settle_process(receipt,process_cpu_seconds=2.)
+            self.assertEqual(current_snapshot(p,receipt)['cpu_seconds'],2.)
+
+    def test_real_process_exit_charges_post_seal_finalization(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            core=Path(temporary)/'core'
+            program='''
+import sys
+from pathlib import Path
+from time import process_time
+from struct2circuit.calibration_v2.budget import Budget
+from struct2circuit.calibration_v2.storage import canonical_json,finish_resources,seal_process
+p=Path(sys.argv[1]);p.mkdir();b=Budget(cpu_origin=0.);b.mandatory_complete=True
+(p/'budget.json').write_text(canonical_json(b.snapshot()))
+r=finish_resources(p,b,'development')
+seal_process(r,process_cpu_seconds=0.,supervisor_cpu_seconds=process_time())
+# Simulate real finalization CPU after the old cutoff and receipt fsync.
+start=process_time()
+while process_time()-start<.1: pass
+'''
+            env=os.environ.copy();env['PYTHONPATH']=str(Path(__file__).resolve().parents[1]/'src')
+            child=subprocess.Popen([sys.executable,'-c',program,str(core)],env=env)
+            _,status,usage=os.wait4(child.pid,0);child.returncode=os.waitstatus_to_exitcode(status)
+            self.assertEqual(child.returncode,0)
+            receipt=Path(str(core)+'.resources.json.process-ended.json')
+            from struct2circuit.calibration_v2.storage import _record
+            early=_record(receipt)['cpu_seconds'];full=usage.ru_utime+usage.ru_stime
+            self.assertGreater(full-early,.08)
+            settle_process(receipt,process_cpu_seconds=full)
+            self.assertEqual(current_snapshot(core,receipt)['cpu_seconds'],full)
+
+    def test_receipt_sealing_crosses_cpu_ceiling_before_diagnostics(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary);dev=Budget();dev.mandatory_complete=True
+            _,prior=self.receipt(root,'development',dev,cpu=28798.2)
+            val=Budget(phase='validation');val.prior_cpu=28798.2;val.prior_wall=dev.snapshot()['wall_seconds'];val.mandatory_complete=True
+            p=root/'validation';p.mkdir();(p/'budget.json').write_text(canonical_json(val.snapshot()))
+            cutoff=finish_resources(p,val,'validation',previous=prior)
+            from struct2circuit.calibration_v2 import storage
+            clock=[.1];original=storage.atomic_json
+            def expensive_seal(*args,**kwargs):
+                result=original(*args,**kwargs);clock[0]+=2.;return result
+            with patch.object(storage,'atomic_json',side_effect=expensive_seal):
+                receipt=seal_process(cutoff,process_cpu_seconds=1.,supervisor_cpu_seconds=clock[0],prior_cpu=28798.2)
+            if hasattr(storage,'settle_process'):
+                storage.settle_process(receipt,process_cpu_seconds=1.+clock[0])
+            with self.assertRaises(BudgetExhausted):
+                Budget.from_snapshot(current_snapshot(p,receipt),phase='diagnostics')
 
 
 class DecisionTests(unittest.TestCase):
@@ -284,6 +426,8 @@ class StorageTests(unittest.TestCase):
             record=finish_resources(p,b,'development')
             with self.assertRaises(ValueError):current_snapshot(p,record)
             sealed=seal_process(record,process_cpu_seconds=1.)
+            with self.assertRaises((ValueError,FileNotFoundError)):current_snapshot(p,sealed)
+            settle_process(sealed,process_cpu_seconds=1.)
             self.assertEqual(current_snapshot(p,sealed)['cpu_seconds'],1.)
 
 
@@ -301,6 +445,7 @@ class EvidenceVerificationTests(unittest.TestCase):
             store.row('instances.jsonl',asdict(cls.spec)|dict(status='generated',Q=sim.problem.Q,c=sim.problem.c,
                 coefficients_sha256=array_hash(sim.problem.Q,sim.problem.c),generator=v1.FAMILIES[0][0],parameters=v1.FAMILIES[0][1]))
             d=PhaseDriver(cases,b,store,expected_keys=cls.keys,synthetic=True).run()
+            cls.driver=d
             assert d.write_results()=='QUALIFIED'
             store.json('calibration_manifest.json',manifest()|dict(phase='development',status='QUALIFIED',phase_status='QUALIFIED',
                 reporting_complete=True,provenance={'driver':identity()},runtime=runtime_identity(),development_finalized=True))
@@ -316,6 +461,7 @@ class EvidenceVerificationTests(unittest.TestCase):
         cls.original={p.name:p.read_bytes() for p in cls.core.iterdir()}
         r=finish_resources(cls.core,b,'development')
         cls.receipt=seal_process(r,process_cpu_seconds=10.)
+        settle_process(cls.receipt,process_cpu_seconds=10.)
 
     @classmethod
     def tearDownClass(cls):cls.temporary.cleanup()
@@ -336,6 +482,94 @@ class EvidenceVerificationTests(unittest.TestCase):
 
     def test_positive_evidence_reconstructed(self):
         self.assertEqual(len(verify_evidence(self.core)),8)
+
+    def test_real_negative_evidence_followed_by_landscape_preserves_failed(self):
+        result=self.driver.results[1042,0,0]
+        original=result.production[33];proofs=self.driver.counterexamples.copy()
+        # Fault-inject an actually evaluated poor production choice. The driver
+        # emits the genuine negative-evidence record from real n=4 values; this
+        # reporting test makes no claim that the real P33 optimizer selects it.
+        bad=result.initial_metrics['normalized_gap']
+        self.assertGreater(bad-result.references['B00'].pooled,DEFICIT+1e-5)
+        try:
+            result.production[33]=replace(original,u=0.,beta=0.,value=bad)
+            self.driver._capture_failures()
+            rows=[self.driver.row(c) for c in self.driver.cases]
+            self.assertTrue(rows[0]['negative_evidence'])
+            self.assertEqual(assess(rows,self.keys)[0],'FAILED')
+        finally:
+            result.production[33]=original;self.driver.counterexamples=proofs
+
+    def test_missing_control_objective_identity_rejected(self):
+        self.alter_row(lambda r:[c.pop('objective_identity',None) for c in r['controls']])
+        with self.assertRaises(ValueError):verify_evidence(self.core)
+
+    def test_cross_landscape_control_substitution_rejected(self):
+        # Keep valid values and points; provenance alone must reject substitution.
+        self.alter_row(lambda r:[c.update(objective_identity='other-landscape-objective') for c in r['controls']])
+        with self.assertRaises(ValueError):verify_evidence(self.core)
+
+    def test_audit_fine_starts_missing_rejected(self):
+        def missing(r):
+            ref=r['references']['B00']
+            ref['attempts']=[a for a in ref['attempts'] if a['source']!='fine_lbfgsb']
+        self.alter_row(missing)
+        with self.assertRaises(ValueError):verify_evidence(self.core)
+
+    def test_audit_start_substitution_rejected(self):
+        def bad(r):
+            next(a for a in r['references']['B00']['attempts'] if a['source']=='fine_lbfgsb')['start']=[.123,.456]
+        self.alter_row(bad)
+        with self.assertRaises(ValueError):verify_evidence(self.core)
+
+    def full_bundle_core(self):
+        p=Path(self.temporary.name)/(self._testMethodName+'-core');sim=toy()
+        cases=[Case(1042,0,g,0,0,sim,64,audit=g==0) for g in range(2)];b=Budget()
+        with OutputStore(p) as store:
+            from struct2circuit.calibration.objective import array_hash
+            store.row('instances.jsonl',asdict(self.spec)|dict(status='generated',Q=sim.problem.Q,c=sim.problem.c,
+                coefficients_sha256=array_hash(sim.problem.Q,sim.problem.c),generator=v1.FAMILIES[0][0],parameters=v1.FAMILIES[0][1]))
+            d=PhaseDriver(cases,b,store,expected_keys=self.keys,synthetic=True).run()
+            result=d.results[1042,0,0]
+            if not result.references['B00'].full_bundle:
+                result.search.complete_bundle(result.references['B00'],v1.BY_NAME['B00'],production=result.production[33])
+                d._selected_oracles(result)
+            self.assertEqual(d.write_results(),'QUALIFIED')
+            store.json('calibration_manifest.json',manifest()|dict(phase='development',status='QUALIFIED',phase_status='QUALIFIED',
+                reporting_complete=True,provenance={'driver':identity()},runtime=runtime_identity(),development_finalized=True))
+            store.sync()
+        f=p/'landscapes.jsonl';rows=[json.loads(x) for x in f.read_text().splitlines()]
+        for row in rows:row['synthetic']=False
+        f.write_text(''.join(canonical_json(r)+'\n' for r in rows))
+        return p
+
+    def test_actual_full_bundle_verifies_and_missing_powell_rejected(self):
+        p=self.full_bundle_core();self.assertEqual(len(verify_evidence(p)),8)
+        f=p/'landscapes.jsonl';rows=[json.loads(x) for x in f.read_text().splitlines()]
+        for row in rows:
+            ref=row['references']['B00'];self.assertEqual(len([a for a in ref['attempts'] if a['source']=='powell']),2)
+            ref['attempts']=[a for a in ref['attempts'] if a['source']!='powell']
+        f.write_text(''.join(canonical_json(r)+'\n' for r in rows))
+        with self.assertRaises(ValueError):verify_evidence(p)
+
+    def test_full_bundle_fine_starts_and_powell_start_tampering_rejected(self):
+        p=self.full_bundle_core();f=p/'landscapes.jsonl';original=f.read_text()
+        for source in ('fine_lbfgsb','powell'):
+            with self.subTest(source=source):
+                rows=[json.loads(x) for x in original.splitlines()]
+                for row in rows:
+                    a=next(a for a in row['references']['B00']['attempts'] if a['source']==source)
+                    a['start']=[.123,.456]
+                f.write_text(''.join(canonical_json(r)+'\n' for r in rows))
+                with self.assertRaises(ValueError):verify_evidence(p)
+
+    def test_routine_local_attempts_missing_rejected(self):
+        def bad(r):
+            a=r['references']['B00']['attempts']
+            first=next(x for x in a if x['source']=='lbfgsb')
+            r['references']['B00']['attempts']=[x for x in a if x['source']!='lbfgsb' or x is first]
+        self.alter_row(bad)
+        with self.assertRaises(ValueError):verify_evidence(self.core)
 
     def test_missing_control_rejected(self):
         self.alter_row(lambda r:r.update(controls=[c for c in r['controls'] if c['kind']!='gradient']))
@@ -373,10 +607,24 @@ class EvidenceVerificationTests(unittest.TestCase):
     def test_complete_lock_and_one_time_capability(self):
         lock=Path(self.temporary.name)/self._testMethodName
         create_lock(lock,self.core,self.receipt,approval='UNIT_TEST_ONLY')
+        settle_publication(lock,process_cpu_seconds=10.)
         gate=ValidationGate(lock)
         self.assertEqual(gate.current_budget()['counters']['actual_evaluations'],json.loads((self.core/'budget.json').read_text())['counters']['actual_evaluations'])
         gate.begin_generation(33)
         with self.assertRaises(ValueError):gate.begin_generation(33)
+
+    def test_coordinator_lock_requires_settlement_covering_publication(self):
+        p=Path(self.temporary.name)/self._testMethodName;p.mkdir()
+        for name,data in self.original.items():(p/name).write_bytes(data)
+        b=Budget.from_snapshot(json.loads((p/'budget.json').read_text()),phase='development')
+        r=finish_resources(p,b,'development');receipt=seal_process(r,process_cpu_seconds=5.)
+        lock=Path(str(p)+'.lock')
+        create_lock(lock,p,receipt,approval='UNIT_TEST_ONLY',_provisional=True)
+        with self.assertRaises((ValueError,FileNotFoundError)):ValidationGate(lock)
+        settle_process(receipt,process_cpu_seconds=10.,publication=lock)
+        gate=ValidationGate(lock)
+        self.assertEqual(gate.current_budget()['cpu_seconds'],10.)
+        self.assertEqual(gate.grant_path,receipt)
 
     def test_persisted_models_restore_without_generators(self):
         from struct2circuit.calibration_v2.diagnostics import restore_models

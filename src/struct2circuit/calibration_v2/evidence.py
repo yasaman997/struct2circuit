@@ -80,6 +80,9 @@ def controls_complete(row):
     points = np.random.default_rng(820000000+10000*i+100*g+10*init).uniform(
         margins, np.array((4*np.pi,2*np.pi))-margins, size=(8,2))
     controls = row.get('controls', [])
+    objective_identity = row.get('objective_identity')
+    if not objective_identity or any(c.get('objective_identity') != objective_identity for c in controls):
+        return False
     if any(c.get('kind')=='gradient' and tuple(c.get('steps',()))!=(1e-5,1e-5/max(1.,width)) for c in controls):
         return False
     required = [('direct_expm', tuple(p)) for p in points]
@@ -167,15 +170,15 @@ def assess(rows, keys, *, stopped=False, phase_failures=()):
                    Check(prefix+':trigger_work','unresolved' if required_work(row,tuple(row['canonical']) in triggers) else 'pass'),
                    Check(prefix+':execution','unresolved' if row.get('error') else 'pass')]
         for j,proof in enumerate(row.get('negative_evidence',[])):
-            values=proof['values']
-            for v in values:
+            proof_values=proof['values']
+            for v in proof_values:
                 if (not v['faces_complete'] or reference_status(agreement(v['a'],v['b'],v['r']))!='pass'
                     or v['refined'] and reference_status(deficit(v['coarse'],v['r']))!='pass'):
                     raise ValueError('Unresolved evidence cannot establish a completed failure')
-            if proof['kind']=='E' and len(values)==1:
-                q=deficit(values[0]['production'],values[0]['r']);threshold=DEFICIT
-            elif proof['kind']=='K' and len(values)==2:
-                a,b=values;q=distortion(a['production'],b['production'],a['r'],b['r']);threshold=DISTORTION
+            if proof['kind']=='E' and len(proof_values)==1:
+                q=deficit(proof_values[0]['production'],proof_values[0]['r']);threshold=DEFICIT
+            elif proof['kind']=='K' and len(proof_values)==2:
+                a,b=proof_values;q=distortion(a['production'],b['production'],a['r'],b['r']);threshold=DISTORTION
             else:raise ValueError('Invalid preserved counterexample')
             if band(q,threshold)!='fail':raise ValueError('Preserved counterexample is not a clear failure')
             checks.append(Check(prefix+f':completed_failure:{j}','fail'))

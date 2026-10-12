@@ -14,7 +14,8 @@ from ..calibration.driver import Case, CaseResult, PhaseDriver as V1Driver, _poi
 from ..calibration.diagnostics import (direct_oracle, gradient_check, invariance_checks,
     reuse_initialization, spectral_coordinates, spectral_diagnostics)
 from ..calibration.objective import Objective, array_hash, production_search
-from ..calibration.reference import Candidate, ReferenceSearch
+from ..calibration.reference import Candidate
+from .reference import ReferenceSearch
 from ..calibration.resources import ResourceGuard, ResourceExhausted
 from ..calibration.storage import OutputStore, ARTIFACTS, PAIR_FIELDS, provenance, preflight_validation_lock
 from ..simulator import FeasibleSubspaceQAOA
@@ -232,13 +233,15 @@ def run_phase(output,*,phase,authorization,protocol,lock=None,lock_output=None,c
     if phase not in ('development','validation'):raise ValueError('Use the separate diagnostics entry path')
     budget=Budget.from_snapshot(gate.current_budget(),phase='validation',cpu_origin=cpu_origin) if gate else Budget(cpu_origin=cpu_origin)
     budget.resource_guard=guard;guard.check(budget,force=True)
-    for path in (str(output)+'.resources.json',str(output)+'.resources.json.process-ended.json'):
+    for path in (str(output)+'.resources.json',str(output)+'.resources.json.process-ended.json',
+                 str(output)+'.resources.json.process-ended.json.settled.json'):
         preflight_validation_lock(path)
     if gate:preflight_validation_lock(str(gate.resource_path)+'.validation-consumed.json')
     if lock_output:
         if phase!='development':raise ValueError('Only development can publish a lock')
         preflight_validation_lock(lock_output)
         preflight_validation_lock(str(lock_output)+'.publication.json')
+        preflight_validation_lock(str(lock_output)+'.publication-ended.json')
         if Path(lock_output).resolve().is_relative_to(Path(output).resolve()):
             raise FileExistsError('Lock must be outside immutable core output')
     with OutputStore(output) as store:
@@ -270,6 +273,6 @@ def run_phase(output,*,phase,authorization,protocol,lock=None,lock_output=None,c
             store.decision(status+'\nReporting or required execution incomplete; no validation lock.\n'+str(error))
             store.sync()
     # Immutable resource sidecars carry finalization/publication overhead.
-    record=finish_resources(output,budget,phase,previous=gate.resource_path if gate else None)
+    record=finish_resources(output,budget,phase,previous=gate.grant_path if gate else None)
     # The supervisor may publish a lock only after it seals full worker CPU.
     return status

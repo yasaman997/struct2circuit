@@ -105,7 +105,47 @@ class Budget(V1Budget):
         if phase == 'validation' and s['phase'] == 'development' and (
             b.limits.total-actual < b.limits.validation_reserve):
             raise ValueError('Validation allocation is not protected')
-        if phase == 'diagnostics' and (s['phase'] != 'validation' or not b.mandatory_complete):
+        if phase == 'diagnostics' and (s['phase'] not in ('validation','diagnostics') or not b.mandatory_complete):
             raise ValueError('Diagnostics require finalized qualified validation')
         b.check_time()
         return b
+
+
+def verify_continuation(prior,current):
+    """A linked phase cannot refund any previous computation or CPU interval."""
+    order={'development':'validation','validation':'diagnostics'}
+    if order.get(prior['phase'])!=current['phase'] or prior['limits']!=current['limits']:
+        raise ValueError('Resource chain changes phase order or approved limits')
+    for snapshot in (prior,current):
+        try:
+            Budget.from_snapshot(snapshot,phase=snapshot['phase'])
+        except BudgetExhausted:
+            # Terminal records must still be exportable. Grants separately enforce
+            # the sticky stop and CPU ceiling before any further numerical work.
+            pass
+    for field in ('counters','phases','per_landscape'):
+        if any(current[field].get(k,0)<v for k,v in prior[field].items()):
+            raise ValueError(f'Cumulative {field} moved backwards')
+    def domains(snapshot):
+        result={}
+        for row in snapshot['per_domain']:
+            key=(row['landscape'],row['domain'],row['counter'])
+            if key in result:raise ValueError('Duplicate persisted domain counter')
+            result[key]=row['count']
+        return result
+    old,new=domains(prior),domains(current)
+    if any(new.get(k,0)<v for k,v in old.items()):
+        raise ValueError('Cumulative domain counters moved backwards')
+    if not set(map(tuple,prior['unique_keys']))<=set(map(tuple,current['unique_keys'])):
+        raise ValueError('Previous computed-key inventory was discarded')
+    active=current['phase']
+    if any(current['phases'][p]!=v for p,v in prior['phases'].items() if p!=active):
+        raise ValueError('A completed phase was reassigned')
+    if (current['counters'].get('actual_evaluations',0)-prior['counters'].get('actual_evaluations',0)
+        !=current['phases'][active]-prior['phases'][active]):
+        raise ValueError('New evaluations are not assigned to the current phase')
+    if current['cpu_seconds']<prior['cpu_seconds'] or current['wall_seconds']<prior['wall_seconds']:
+        raise ValueError('Cumulative elapsed resources moved backwards')
+    if prior['stop_reason'] and (current['stop_reason']!=prior['stop_reason'] or
+        current['counters'].get('actual_evaluations',0)!=prior['counters'].get('actual_evaluations',0)):
+        raise ValueError('A sticky resource stop was bypassed')

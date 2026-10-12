@@ -24,14 +24,25 @@ landscape / 28,800 CPU-second ceilings. Fresh repeats and oracles are charged;
 cache reads and gradient work reusing a state have separate counters. Restoring a
 unique-key inventory never restores evaluated values or states.
 
-The entry point supervises numerical workers with `wait4`. Immutable resource
-cutoff records are followed by process-exit receipts covering worker imports,
-construction, computation, reporting and shutdown. Subsequent lock-publication
-overhead is deducted in a linked publication record, retaining its measurement
-cutoff. Validation imports and verification are charged from process startup.
-Unsealed receipts, depleted resources and accounting disagreement reject a lock.
-CPU receipt/publication cutoffs remain explicit; external execution telemetry should
-preserve the final supervisor exit accounting when an official run is authorized.
+The entry point uses an OS accounting observer around the phase coordinator and
+its numerical worker. Linux `wait4` accounts for the exited coordinator and its
+waited children, including imports, construction, computation, artifact reporting,
+receipt canonicalization/hashing/writes/fsyncs, lock publication and shutdown.
+An early worker receipt is a cutoff, not an execution grant. Only its immutable
+`.settled.json` process-tree exit record exposes cumulative CPU to later phases;
+it replaces the partial estimate without double-counting worker CPU. This final
+record is OS measurement evidence emitted by the accounting observer after all
+official phase processes exit, not another scientific worker or lock publisher.
+An independently invoked lock publisher likewise requires its observed process-exit
+`.publication-ended.json` record. Missing settlement or a ceiling crossed during
+finalization rejects the capability. A directly invoked `--worker`/`--coordinator`
+cannot create a usable grant without this external process-exit measurement.
+
+Resource verification traverses prior receipts and immutable core ledgers. Every
+evaluation, request, phase, landscape and domain counter is monotone; completed
+phase allocations cannot change; old computed keys cannot disappear. The next
+phase must bind the exact settled preceding grant, including publication CPU.
+Limits stay fixed, and a resource stop cannot be reset through a new process.
 
 The new schema-2 verifier reconstructs expected coverage, grids, boundary nodes,
 independent route identities/settings, raw R/F/E/K, controls, aliases, pairs and
@@ -40,6 +51,14 @@ official limits and complete development evidence can publish a v2 lock. V1 lock
 cannot authorize v2. Consumption is atomic and fsynced before validation generation;
 the marker derives from the bound resource receipt, so copying a lock does not
 create another capability. Interruption leaves it consumed.
+
+Every control must carry its canonical objective identity. The verifier also
+reconstructs required routine/fine starts with the unchanged start-selection helper
+and checks the full bundle's two distinct Powell starts. V2 records Powell's actual
+first evaluated point without changing its optimizer. Boolean refinement flags and
+upper attempt-count bounds cannot substitute for the prescribed work. Preserved
+negative evidence uses separate proof variables so subsequent landscapes still
+classify and retain a demonstrated FAILED outcome.
 
 Every official authorization must contain `calibration_execution_authorized=true`,
 the exact `protocol_sha256`, current `driver` identity, `approval_identity`, a single

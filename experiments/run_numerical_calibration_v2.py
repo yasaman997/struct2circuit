@@ -23,6 +23,7 @@ def main():
     p.add_argument('--development-output',type=Path);p.add_argument('--validation-output',type=Path)
     p.add_argument('--resource-record',type=Path)
     p.add_argument('--worker',action='store_true',help=argparse.SUPPRESS)
+    p.add_argument('--coordinator',action='store_true',help=argparse.SUPPRESS)
     a=p.parse_args()
     if a.phase is None:
         from struct2circuit.calibration_v2.config import manifest,verify_protocol
@@ -31,6 +32,18 @@ def main():
     if a.phase=='validation' and not a.validation_lock:p.error('Validation requires a v2 lock')
     if a.phase=='diagnostics' and not all((a.development_output,a.validation_output,a.resource_record,a.validation_lock)):
         p.error('Diagnostics require both qualified core outputs, resource receipt and lock')
+    if not a.worker and not a.coordinator:
+        # OS accounting observer. All scientific work and receipt/lock writers
+        # run below this boundary, including the former supervisor's shutdown.
+        child=subprocess.Popen([sys.executable,__file__,*sys.argv[1:],'--coordinator'])
+        _,status,usage=os.wait4(child.pid,0)
+        child.returncode=os.waitstatus_to_exitcode(status)
+        if child.returncode:raise SystemExit(child.returncode)
+        from struct2circuit.calibration_v2.storage import settle_process
+        publication=a.write_validation_lock if a.write_validation_lock and a.write_validation_lock.exists() else None
+        settle_process(Path(str(a.output)+'.resources.json.process-ended.json'),
+            process_cpu_seconds=usage.ru_utime+usage.ru_stime,publication=publication)
+        return
     if a.worker:
         if a.phase=='diagnostics':
             from struct2circuit.calibration_v2.diagnostics import run_diagnostics
@@ -63,7 +76,8 @@ def main():
         m=json.loads((a.output/'calibration_manifest.json').read_text())
         if m.get('status')=='QUALIFIED' and m.get('reporting_complete'):
             auth=authorize(a.authorization,a.phase,a.output)
-            create_lock(a.write_validation_lock,a.output,receipt,approval=auth['approval_identity'],publication_origin=publication_origin)
+            create_lock(a.write_validation_lock,a.output,receipt,approval=auth['approval_identity'],
+                publication_origin=publication_origin,_provisional=True)
 
 
 if __name__=='__main__':main()
