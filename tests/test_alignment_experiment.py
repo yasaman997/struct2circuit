@@ -436,17 +436,27 @@ class SafetyTests(unittest.TestCase):
     def test_absent_mismatched_and_reused_authorization(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
-            with self.assertRaises(PermissionError): storage.authorization(None, root/'output')
+            with self.assertRaisesRegex(PermissionError, 'Separate persisted'): storage.authorization(None, root/'output')
             auth = root/'auth.json'; auth.write_text('{}')
-            with self.assertRaises(PermissionError): storage.authorization(auth, root/'output')
+            with self.assertRaisesRegex(PermissionError, 'Authorization must bind'): storage.authorization(auth, root/'output')
             value = dict(execution_authorized=True, scope=config.SCOPE, design_sha256=config.DESIGN_HASH,
                 implementation=config.identity(), manifest_sha256=canonical_hash(config.manifest()), output=str(root/'output'),
                 approval_identity='synthetic-test-only', historical_archive='/workspace/calibration-archives/stage7b-development-e8dea4d-v1.tar.gz',
                 historical_archive_sha256=config.HISTORY_HASH,
                 development_records={str(Path('/workspace/calibration-runs')/n/'instances.jsonl'): h for n, h in config.DEVELOPMENT.items()})
             auth.write_text(json.dumps(value)); Path(str(auth)+'.used').write_text('already-used')
-            with patch.object(storage, 'file_hash', side_effect=lambda p: config.HISTORY_HASH if str(p).endswith('.tar.gz') else hashlib.sha256(Path(p).read_bytes()).hexdigest()), patch.object(storage, 'public_seed_check'):
-                with self.assertRaises(PermissionError): storage.authorization(auth, root/'output')
+            historical = value['development_records']
+            historical_text = json.dumps(dict(instance_id=0, split='development', coefficients_sha256='synthetic-toy'))
+            read_text = Path.read_text
+            def fixture_hash(p):
+                if str(p) in historical: return historical[str(p)]
+                if str(p).endswith('.tar.gz'): return config.HISTORY_HASH
+                return hashlib.sha256(Path(p).read_bytes()).hexdigest()
+            def fixture_text(p, *args, **kwargs):
+                if str(p) in historical: return historical_text
+                return read_text(p, *args, **kwargs)
+            with patch.object(storage, 'file_hash', side_effect=fixture_hash), patch.object(Path, 'read_text', new=fixture_text), patch.object(storage, 'public_seed_check'):
+                with self.assertRaisesRegex(PermissionError, 'already consumed'): storage.authorization(auth, root/'output')
 
     def test_authorization_claim_is_one_use_and_preserves_original_bytes(self):
         with tempfile.TemporaryDirectory() as d:
