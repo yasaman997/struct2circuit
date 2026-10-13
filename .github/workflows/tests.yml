@@ -17,4 +17,4 @@ jobs:
         with:
           python-version: "3.11"
       - run: python -m pip install -e .
-      - run: python -m unittest discover -s tests -v
+      - run: python tests/run_calibration_regressions.py
