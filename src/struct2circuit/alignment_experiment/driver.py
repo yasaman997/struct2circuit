@@ -3,20 +3,21 @@ from dataclasses import fields
 from pathlib import Path
 import json
 import os
+import sys
 
 import numpy as np
 
 from .. import problems
 from ..calibration.budget import BudgetExhausted
-from ..calibration.objective import Evaluation, array_hash
-from ..calibration.reference import Candidate, ReferenceResult
+from ..calibration.objective import array_hash
+from ..calibration.reference import ReferenceResult
 from ..calibration_v2.storage import atomic_json
 from ..mixers import MixerSpec
 from ..simulator import FeasibleSubspaceQAOA
 from .budget import Budget, Guard
 from .config import identity, panel, runtime, public_seed_check
 from .evidence import bindings
-from .reference import Objective, ReferenceSearch, pre_controls, transport_controls, final_controls, interior
+from .reference import Objective, Evaluation, Candidate, ReferenceSearch, pre_controls, transport_controls, final_controls, interior
 from .selection import select
 from .storage import authorization, claim, checkpoint, file_hash, finish
 
@@ -33,7 +34,8 @@ def _controls(row, records):
 def _cache_write(path, obj):
     entries = list(obj.cache.values())
     metadata = [dict(u=e.u, beta=e.beta, gamma=e.gamma, gap=e.gap, expectation=e.expectation,
-                     span=e.span, cost_status=e.cost_status, mixer_width=e.mixer_width) for e in entries]
+                     span=e.span, cost_status=e.cost_status, mixer_width=e.mixer_width,
+                     computation_id=e.computation_id) for e in entries]
     with path.open('xb') as f:
         np.savez(f, metadata=json.dumps(metadata), identity=obj.identity,
                  states=np.array([e.state for e in entries]))
@@ -146,10 +148,21 @@ def run_once(auth_path, output, prior_cpu=0.):
                     except BudgetExhausted as error:
                         record['unresolved_reason'] = str(error)
                     except (ArithmeticError, ValueError) as error:
+                        if hasattr(search, 'partial_result'):
+                            record['reference'] = search.partial_result.record()
                         record['integrity_failure'] = True
                         record['unresolved_reason'] = str(error)
                         raise
                     finally:
+                        if sys.exc_info()[0] is not None:
+                            partial = getattr(search, 'partial_result', None)
+                            if partial is None and search.observed_candidates:
+                                partial = ReferenceResult('B00', candidates=search.observed_candidates)
+                            if partial is not None:
+                                partial.complete = False
+                                partial.unresolved_reason = type(sys.exc_info()[1]).__name__
+                                record['reference'] = partial.record()
+                            record['unresolved_reason'] = type(sys.exc_info()[1]).__name__
                         atomic_json(path, record)
                         obj.release_cache()
             previous = checkpoint(output, budget, wave, previous=previous)

@@ -4,16 +4,19 @@ from pathlib import Path
 import hashlib
 import json
 import os
+from struct import unpack
 
 import numpy as np
 
 from ..calibration.storage import canonical_hash
+from ..calibration.config import BY_NAME
 from ..calibration_v2.storage import atomic_json
 from ..outputs import preflight_outputs
 from ..problems import CardinalityQUBO
 from .config import DESIGN_HASH, DEVELOPMENT, HISTORY_HASH, ROOT, SCOPE, identity, manifest, panel, public_seed_check, verify_design
 from .evidence import analyze, bindings
 from .selection import select
+from .provenance import read_results, reconcile
 
 
 def file_hash(path):
@@ -93,6 +96,7 @@ def claim(path, output, auth):
 
 def checkpoint(output, budget, name, *, previous=None):
     payload = dict(snapshot=budget.snapshot(), journal_sha256=file_hash(budget.path),
+                   results_sha256=file_hash(budget.results_path),
                    previous=previous, previous_sha256=file_hash(output/previous) if previous else None)
     filename = f'resources-{name}.json'
     atomic_json(output/filename, dict(payload=payload, sha256=canonical_hash(payload)))
@@ -132,6 +136,8 @@ def verify_ledger(output, latest):
             if (canonical_hash(e) != record['sha256'] or e['previous'] != previous or e['sequence'] != i
                 or e['domain'] != 'B00'):
                 raise ValueError('Evaluation journal chain mismatch')
+            if not BY_NAME['B00'].contains(unpack('>dd', bytes.fromhex(e['coordinates']))):
+                raise ValueError('Admitted computation lies outside B00')
             events.append(e); previous = record['sha256']
     chain, seen = [], set()
     while latest:
@@ -145,6 +151,8 @@ def verify_ledger(output, latest):
             raise ValueError('Linked resource receipt altered')
         chain.append(p); latest = p['previous']
     prior = None
+    provenance = read_results(output/'evaluations.results.jsonl', events)
+    result_records = provenance['records']
     for receipt in reversed(chain):
         snap = receipt['snapshot']; count = snap['counters'].get('actual_evaluations', 0)
         if (not np.isfinite(snap['cpu_seconds']) or snap['cpu_seconds'] < 0
@@ -155,6 +163,18 @@ def verify_ledger(output, latest):
         if type(count) is not int or not 0 <= count <= len(events):
             raise ValueError('Invalid cumulative evaluation count')
         prefix = events[:count]
+        result_count = snap.get('result_count')
+        if type(result_count) is not int or not 0 <= result_count <= len(result_records):
+            raise ValueError('Invalid numerical result/request cutoff')
+        result_prefix = result_records[:result_count]
+        if snap.get('result_tail') != (result_prefix[-1]['sha256'] if result_prefix else None):
+            raise ValueError('Numerical result/request cutoff digest mismatch')
+        requests = [r['payload'] for r in result_prefix if r['payload']['kind']=='request']
+        cached = [r['payload'] for r in result_prefix if r['payload']['kind']=='resolution' and r['payload']['cached']]
+        results = [r['payload'] for r in result_prefix if r['payload']['kind']=='result']
+        prefix_ids = {canonical_hash(e) for e in prefix}
+        if any(r['computation_id'] not in prefix_ids for r in results):
+            raise ValueError('Resource cutoff contains results for uncharged computations')
         tail = canonical_hash(prefix[-1]) if prefix else None
         arms = dict(Counter(e['landscape'] for e in prefix))
         domains = [dict(arm=a, domain='B00', count=n) for a, n in sorted(arms.items())]
@@ -162,15 +182,22 @@ def verify_ledger(output, latest):
             or snap['counters'].get('essential', 0) != count
             or snap['counters'].get('oracle_calls', 0) != sum(e['oracle'] for e in prefix)
             or snap['counters'].get('derivative_evolutions', 0) != sum(e['derivative'] for e in prefix)
+            or snap['counters'].get('objective_requests', 0) != len(requests)
+            or snap['counters'].get('cache_hits', 0) != len(cached)
+            or snap['counters'].get('gradient_computations', 0) != sum(r['gradient_started'] for r in results)
+            or snap['counters'].get('matrix_exponentials', 0) != sum(r['matrix_exponentials'] for r in results)
             or count > snap['limits']['total'] or any(n > snap['limits']['arm'] for n in arms.values())):
             raise ValueError('Resource counters do not match persisted journal')
         if prior and (count < prior['counters'].get('actual_evaluations', 0) or snap['cpu_seconds'] < prior['cpu_seconds']
+                      or result_count < prior['result_count']
                       or snap['wall_seconds'] < prior['wall_seconds']
                       or any(snap['counters'].get(k, 0) < v for k, v in prior['counters'].items())):
             raise ValueError('Cumulative resource counters were reset')
         prior = snap
     if count != len(events) or chain[0]['journal_sha256'] != file_hash(output/'evaluations.jsonl'):
         raise ValueError('Final receipt omits numerical work')
+    if result_count != len(result_records) or chain[0]['results_sha256'] != file_hash(output/'evaluations.results.jsonl'):
+        raise ValueError('Final receipt omits numerical results/requests')
     return prior
 
 
@@ -203,7 +230,10 @@ def verify(output):
     if worker['cpu_seconds'] < snap['cpu_seconds'] or settled['cpu_seconds'] < worker['cpu_seconds']:
         raise ValueError('Receipt finalization CPU was omitted')
     records = json.loads((output/'records.json').read_text())
+    admissions = [json.loads(line)['payload'] for line in (output/'evaluations.jsonl').read_text().splitlines()]
+    reconcile(records, read_results(output/'evaluations.results.jsonl', admissions))
     coefficients = set()
+    allowed_objectives = {}
     specs = {(s['family'],s['replicate']):s for s in panel()}
     for row in records:
         if canonical_hash(row.get('spec')) != canonical_hash(specs.get((row['family'],row['replicate']))):
@@ -239,9 +269,12 @@ def verify(output):
             transported_problem = CardinalityQUBO(problem.Q[np.ix_(inverse, inverse)], problem.c[inverse], 3)
             transported_edges = tuple(tuple(sorted((int(p[i]), int(p[j])))) for i, j in graph['edges'])
             transported_identity = bindings(transported_problem, transported_edges, f"{row['family']}:{row['replicate']}:{arm}", inventory['implementation'])['objective_identity']
+            allowed_objectives[f"{row['family']}:{row['replicate']}:{arm}"] = {expected['objective_identity'], transported_identity}
             for control in actual.get('controls', []):
                 if control['kind'] == 'cyclic_transport' and control.get('transported_identity') != transported_identity:
                     raise ValueError('Transport control substituted its comparison objective')
+    if any(e['identity'] not in allowed_objectives.get(e['landscape'],set()) for e in admissions):
+        raise ValueError('Journal computation belongs to an unbound objective/arm')
     result = analyze(records)
     if result != json.loads((output/'provisional-analysis.json').read_text()):
         # JSON converts integer family-map keys into strings.

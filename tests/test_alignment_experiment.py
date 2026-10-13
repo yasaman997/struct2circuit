@@ -28,6 +28,8 @@ from struct2circuit.calibration_v2.storage import atomic_json
 from struct2circuit.alignment_experiment import config, selection, evidence, storage
 from struct2circuit.alignment_experiment.budget import Budget, ArmExhausted, BudgetExhausted, Guard
 from struct2circuit.alignment_experiment.reference import Objective, ReferenceSearch
+from struct2circuit.alignment_experiment.reference import candidate_id, final_controls, seal_control
+from struct2circuit.alignment_experiment.provenance import read_results, reconcile
 
 
 def toy(symmetric=False):
@@ -96,7 +98,45 @@ def scalar_arm(value=.2):
     controls += [control('cyclic_transport', p) for p in product(np.linspace(0., 2*pi, 5), np.linspace(0., pi, 5))]
     reference = dict(candidates=candidates, attempts=attempts, refined=True, full_bundle=True,
                      coarse=value, pooled=value, route_a=value, route_b=value, r=0., f=0.)
-    coarse_reference=dict(candidates=[c for c in candidates if c['source'] in ('grid','de_0')])
+    # Scalar-only verifier fixture. Every attempted request has a distinct
+    # observation and the terminal fresh check is identified separately.
+    def annotate(c, attempt=None, observation='search'):
+        index=len(annotated)
+        c.update(success=True if observation=='terminal' else None, seed=c.get('seed'),
+            computation_id=f'toy-computation-{index}', request_id=f'toy-request-{index}',
+            attempt_id=attempt, observation=observation)
+        c['candidate_id']=candidate_id(c);annotated.append(c)
+        return c
+    annotated=[]
+    for c in candidates:
+        if c['source'] in ('grid','fine_grid'):annotate(c)
+    candidates[:]=annotated
+    for index,a in enumerate(attempts):
+        a.update(objective_identity='toy-identity',index=index,success=True,message='synthetic return',
+                 failed_request_id=None,start=a.get('start'),start_candidate_id=None)
+        if a['source'].startswith('de_polish_'):
+            winner=min((c for c in candidates if c['source']=='de_'+a['source'][-1]),key=lambda c:(c['value'],c['u'],c['beta']))
+            a.update(start=[winner['u'],winner['beta']],start_candidate_id=winner['candidate_id'])
+        if a['source']=='powell':
+            winner=min((c for c in candidates if [c['u'],c['beta']]==a['start'] and c['source']!='powell'),key=lambda c:(c['value'],c['u'],c['beta']))
+            a['start_candidate_id']=winner['candidate_id']
+        fields=('objective_identity','index','route','source','seed','start','start_candidate_id','bounds','settings','objective_call_cap')
+        a['attempt_id']=canonical_hash({k:a[k] for k in fields})
+        point=a['start'] or [.73,.33]
+        observations=[]
+        for j in range(a['objective_calls']+1):
+            c=dict(u=point[0],beta=point[1],value=value,route=a['route'],source=a['source'],seed=a['seed'],objective_identity='toy-identity')
+            annotate(c,a['attempt_id'],'terminal' if j==a['objective_calls'] else 'solver')
+            candidates.append(c);observations.append(c)
+        a['observations']=[c['candidate_id'] for c in observations[:-1]]
+        a['terminal_candidate_id']=observations[-1]['candidate_id']
+        a['work']=dict(requests=[c['request_id'] for c in observations],computations=[c['computation_id'] for c in observations])
+        a['actual_evaluations']=len(observations)
+    winners=[min((c for c in candidates if c['route']==route),key=lambda c:(c['value'],c['u'],c['beta'])) for route in ('A','B')]
+    winners.append(min(candidates,key=lambda c:(c['value'],c['u'],c['beta'])))
+    for role,c,pair in zip(('route_a','route_b','selected'),winners,(controls[20:22],controls[22:24],controls[24:26])):
+        for check in pair:check.update(candidate_id=c['candidate_id'],winner_role=role)
+    coarse_reference=dict(candidates=[c for c in candidates if c['source'] in ('grid','lbfgsb','de_0','de_polish_0')])
     return dict(bindings=bound, controls=controls, reference=reference, faces=faces, mixer_width=8.,
                 coarse_reference=coarse_reference, interior_points=points, unresolved_reason=None, integrity_failure=False)
 
@@ -282,17 +322,21 @@ class EvidenceTests(unittest.TestCase):
         for source in ('fine_lbfgsb', 'powell', 'de_1', 'de_polish_1'):
             row = deepcopy(self.valid)
             row['reference']['attempts'] = [a for a in row['reference']['attempts'] if a['source'] != source]
-            self.assertIsNone(evidence.verify_reference(row, 0, 0)[0])
+            try:
+                value,_=evidence.verify_reference(row,0,0)
+            except ValueError:
+                continue
+            self.assertIsNone(value)
 
     def test_wrong_start_and_powell_duplicate_are_unresolved(self):
         for source in ('fine_lbfgsb', 'powell'):
             row = deepcopy(self.valid)
             next(a for a in row['reference']['attempts'] if a['source'] == source)['start'] = [.123, .234]
-            self.assertIsNone(evidence.verify_reference(row, 0, 0)[0])
+            with self.assertRaises(ValueError): evidence.verify_reference(row, 0, 0)
 
     def test_missing_grid_or_face_work_is_unresolved(self):
         row = deepcopy(self.valid); row['reference']['candidates'].pop(0)
-        self.assertIsNone(evidence.verify_reference(row, 0, 0)[0])
+        with self.assertRaises(ValueError): evidence.verify_reference(row, 0, 0)
         row = deepcopy(self.valid); row['faces'][0]['complete'] = False
         self.assertIsNone(evidence.verify_reference(row, 0, 0)[0])
 
@@ -324,7 +368,7 @@ class EvidenceTests(unittest.TestCase):
         row = deepcopy(self.valid); row['unresolved_reason'] = 'arm_evaluation_ceiling'
         self.assertIsNone(evidence.verify_reference(row, 0, 0)[0])
         row = deepcopy(self.valid); row['reference']['attempts'][0]['interrupted'] = 'ArmExhausted'
-        self.assertIsNone(evidence.verify_reference(row, 0, 0)[0])
+        with self.assertRaises(ValueError): evidence.verify_reference(row, 0, 0)
 
 
 class ResourceTests(unittest.TestCase):
@@ -498,14 +542,23 @@ class WorkflowTests(unittest.TestCase):
             def __init__(self): self.budget, self.cache = budget, {}
             def key(self, u, beta): return self.identity, pack('>dd', float(u), float(beta))
             def evaluate(self, u, beta, domain='B00', *, fresh=False):
-                key = self.key(u, beta); budget.request(self.landscape, domain)
+                key = self.key(u, beta); request=budget.request(self.landscape,domain,key=key,fresh=fresh)
+                self.last_request_id=request
                 if not fresh and key in self.cache:
-                    budget.counts['cache_hits'] += 1; return self.cache[key]
-                budget.charge(key, self.landscape, domain)
-                self.cache[key] = SimpleNamespace(gap=.2)
-                return self.cache[key]
+                    budget.resolve(request,self.cache[key].computation_id,cached=True)
+                    self.last=self.cache[key];return self.last
+                computation=None
+                try:
+                    computation=budget.charge(key,self.landscape,domain,request_id=request,fresh=fresh)
+                except BaseException as error:
+                    budget.resolve(request,None,error=error);raise
+                budget.outcome(computation,dict(gap=.2,state_sha256='synthetic'))
+                budget.resolve(request,computation)
+                self.cache[key] = self.last = SimpleNamespace(gap=.2,computation_id=computation)
+                return self.last
             def gradient(self, point, domain):
-                budget.charge(self.key(*point), self.landscape, domain, derivative=True)
+                computation=budget.charge(self.key(*point), self.landscape, domain, derivative=True)
+                budget.outcome(computation,[0.,0.])
                 return np.zeros(2)
         return Scalar()
 
@@ -527,6 +580,10 @@ class WorkflowTests(unittest.TestCase):
             row = scalar_arm(); row['reference'] = json.loads(json.dumps(result.record()))
             row['coarse_reference'] = dict(candidates=[c for c in row['reference']['candidates'] if c['source'] in ('grid','lbfgsb','de_0','de_polish_0')])
             row['faces'] = json.loads(json.dumps(search.face_records))
+            winners=[min((c for c in row['reference']['candidates'] if c['route']==route),key=lambda c:(c['value'],c['u'],c['beta'])) for route in ('A','B')]
+            winners.append(min(row['reference']['candidates'],key=lambda c:(c['value'],c['u'],c['beta'])))
+            for role,c,pair in zip(('route_a','route_b','selected'),winners,(row['controls'][20:22],row['controls'][22:24],row['controls'][24:26])):
+                for control in pair:control.update(candidate_id=c['candidate_id'],winner_role=role)
             self.assertEqual(evidence.verify_reference(row,0,0), (.2,False))
             self.assertEqual(len(observed_de), 2)
             self.assertEqual([x['maxiter'] for x in observed_de], [63,126])

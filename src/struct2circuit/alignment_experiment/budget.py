@@ -1,5 +1,6 @@
 """One-shot, control-inclusive resource ledger. Existing journals never restart."""
 from collections import Counter
+from contextlib import contextmanager
 from pathlib import Path
 from time import monotonic, process_time
 import json
@@ -28,6 +29,39 @@ class Budget:
         self.counts, self.landscapes, self.domains = Counter(), Counter(), Counter()
         self.unique, self.stop_reason, self.arm_stops = set(), None, {}
         self.previous = None
+        self.results_path = self.path.with_suffix('.results.jsonl')
+        self.results_file = self.results_path.open('x', encoding='utf8')
+        self.result_tail, self.result_count = None, 0
+        self.traces = []
+
+    def record(self, payload):
+        payload = dict(payload, sequence=self.result_count+1, previous=self.result_tail)
+        digest = canonical_hash(payload)
+        self.results_file.write(json.dumps(dict(payload=payload, sha256=digest), sort_keys=True, allow_nan=False)+'\n')
+        self.results_file.flush()
+        self.result_tail, self.result_count = digest, self.result_count+1
+        return digest
+
+    @contextmanager
+    def trace(self):
+        work = dict(requests=[], computations=[])
+        self.traces.append(work)
+        try:
+            yield work
+        finally:
+            assert self.traces.pop() is work
+
+    def outcome(self, computation, value=None, *, error=None, gradient_started=False, matrix_exponentials=0):
+        return self.record(dict(kind='result', computation_id=computation,
+            status='failed' if error is not None else 'success', value=value,
+            gradient_started=gradient_started, matrix_exponentials=matrix_exponentials,
+            error=None if error is None else dict(type=type(error).__name__, reason=str(error))))
+
+    def resolve(self, request, computation, *, cached=False, error=None):
+        if cached:
+            self.counts['cache_hits'] += 1
+        self.record(dict(kind='resolution', request_id=request, computation_id=computation,
+            cached=cached, error=None if error is None else dict(type=type(error).__name__, reason=str(error))))
 
     def check_time(self):
         if self.stop_reason:
@@ -41,13 +75,20 @@ class Budget:
         if self.stop_reason:
             raise BudgetExhausted(self.stop_reason)
 
-    def request(self, landscape, domain):
+    def request(self, landscape, domain, *, key=None, fresh=False, category='native'):
         if domain != 'B00':
             raise ValueError('Only B00 numerical work is permitted')
         self.check_time()
         self.counts['objective_requests'] += 1
+        request = self.record(dict(kind='request', landscape=landscape, domain=domain,
+            identity=key[0] if key else None, coordinates=key[1].hex() if key else None,
+            fresh=fresh, category=category))
+        for trace in self.traces:
+            trace['requests'].append(request)
+        return request
 
-    def charge(self, key, landscape, domain, account='essential', *, oracle=False, optional=False, derivative=False):
+    def charge(self, key, landscape, domain, account='essential', *, oracle=False, optional=False, derivative=False,
+               request_id=None, fresh=False):
         self.check_time()
         if domain != 'B00' or optional or account != 'essential':
             raise ValueError('No broader-domain or optional execution')
@@ -59,6 +100,7 @@ class Budget:
             raise ArmExhausted('arm_evaluation_ceiling')
         event = dict(sequence=self.counts['actual_evaluations']+1, landscape=landscape, domain=domain,
                      identity=key[0], coordinates=key[1].hex(), oracle=oracle, derivative=derivative,
+                     request_id=request_id, fresh=fresh,
                      previous=self.previous)
         digest = canonical_hash(event)
         self.file.write(json.dumps(dict(payload=event, sha256=digest), sort_keys=True, allow_nan=False)+'\n')
@@ -71,18 +113,24 @@ class Budget:
         self.landscapes[landscape] += 1
         self.domains[(landscape, domain)] += 1
         self.unique.add(key)
+        for trace in self.traces:
+            trace['computations'].append(digest)
+        return digest
 
     def snapshot(self):
         self.file.flush(); os.fsync(self.file.fileno())
+        self.results_file.flush(); os.fsync(self.results_file.fileno())
         return dict(counters=dict(self.counts), per_arm=dict(self.landscapes),
                     per_domain=[dict(arm=a, domain=d, count=v) for (a, d), v in sorted(self.domains.items())],
-                    journal_tail=self.previous, cpu_seconds=self.cpu_clock()-self.cpu_origin,
+                    journal_tail=self.previous, result_tail=self.result_tail, result_count=self.result_count,
+                    cpu_seconds=self.cpu_clock()-self.cpu_origin,
                     wall_seconds=self.wall_clock()-self.wall_origin, stop_reason=self.stop_reason,
                     arm_stops=self.arm_stops, limits=dict(total=self.total, arm=self.arm,
                     numerical_cpu=self.numerical_cpu, cpu=self.cpu_limit))
 
     def close(self):
         self.file.flush(); os.fsync(self.file.fileno()); self.file.close()
+        self.results_file.flush(); os.fsync(self.results_file.fileno()); self.results_file.close()
 
 
 class Guard:

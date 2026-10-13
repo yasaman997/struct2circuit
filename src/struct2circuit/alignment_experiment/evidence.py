@@ -11,7 +11,7 @@ from ..calibration.objective import array_hash
 from ..calibration.storage import canonical_hash
 from ..mixers import MixerSpec, xy_mixer_hamiltonian
 from .config import DESIGN_HASH, seed
-from .reference import interior
+from .reference import interior, candidate_id
 
 
 def bindings(problem, edges, landscape, implementation):
@@ -57,6 +57,77 @@ def _starts(candidates, axes, count):
         if len(chosen) == count:
             break
     return [list(p) for p, _ in chosen]
+
+
+def verify_attempts(reference, objective_identity):
+    """Bind solver observations and terminal fresh checks to the exact attempt."""
+    candidates = reference.get('candidates', [])
+    by_id = {c.get('candidate_id'): c for c in candidates}
+    if None in by_id or len(by_id) != len(candidates):
+        return False
+    for c in candidates:
+        if c['candidate_id'] != candidate_id(c) or not c.get('request_id') or not c.get('computation_id'):
+            raise ValueError('Candidate provenance digest or numerical link mismatch')
+    complete = True
+    attempts = reference.get('attempts', [])
+    ids = set()
+    solver_sources = {'lbfgsb','fine_lbfgsb','de_0','de_1','de_polish_0','de_polish_1','powell'}
+    for index, a in enumerate(attempts):
+        fields = ('objective_identity','index','route','source','seed','start','start_candidate_id',
+                  'bounds','settings','objective_call_cap')
+        if any(k not in a for k in fields) or not a.get('attempt_id'):
+            complete = False
+            continue
+        if (a['index'] != index or a['objective_identity'] != objective_identity
+            or a['attempt_id'] != canonical_hash({k:a[k] for k in fields}) or a['attempt_id'] in ids):
+            raise ValueError('Attempt specification/identity mismatch')
+        ids.add(a['attempt_id'])
+        observed = [c for c in candidates if c.get('attempt_id') == a['attempt_id']]
+        solver = [c for c in observed if c.get('observation') == 'solver']
+        terminal = [c for c in observed if c.get('observation') == 'terminal']
+        if (any(c['source'] != a['source'] or c['route'] != a['route'] or c.get('seed') != a['seed'] for c in observed)
+            or len(observed) != len(solver)+len(terminal)):
+            raise ValueError('Candidate attempt route/source/seed substitution')
+        if ([c['candidate_id'] for c in solver] != a.get('observations')
+            or a.get('objective_calls') != len(solver)+int(bool(a.get('failed_request_id')))
+                                          +int(bool(a.get('unreturned_request_id')))+int(bool(a.get('blocked_call')))):
+            complete = False
+        if not solver or not a.get('work'):
+            complete = False
+        if len({c['request_id'] for c in observed}) != len(observed):
+            raise ValueError('A solver observation reused another request')
+        if a.get('interrupted') is None:
+            if len(terminal) != 1 or terminal[0]['candidate_id'] != a.get('terminal_candidate_id') or a.get('failed_request_id'):
+                complete = False
+            elif type(a.get('success')) is not bool or terminal[0].get('success') != a['success']:
+                raise ValueError('Terminal observation differs from the solver return status')
+        else:
+            complete = False  # retained partial work never establishes completeness
+            if terminal or a.get('terminal_candidate_id'):
+                raise ValueError('Interrupted attempt claims a terminal evaluation')
+            if a['interrupted'] == 'AttemptLimit' and (
+                a.get('message') != 'solver_objective_call_cap' or a['objective_calls'] != a['objective_call_cap']
+                or a.get('failed_request_id') or a.get('unreturned_request_id') or a.get('blocked_call')):
+                raise ValueError('AttemptLimit without exhausting the declared allowance')
+            if (a.get('unreturned_request_id') or a.get('blocked_call')) and a['interrupted'] not in ('BudgetExhausted','ArmExhausted'):
+                raise ValueError('Unreturned/blocked request lacks a resource interruption')
+        if a['source'].startswith('de_polish_'):
+            source = 'de_'+a['source'][-1]
+            de = [c for c in candidates if c['source'] == source]
+            winner = min(de, key=lambda c:(c['value'],c['u'],c['beta'])) if de else None
+            if not winner:
+                complete = False
+            elif a['start_candidate_id'] != winner['candidate_id'] or a['start'] != [winner['u'],winner['beta']]:
+                raise ValueError('DE polish start differs from its retained DE winner')
+    if any(c['source'] in solver_sources and c.get('attempt_id') not in ids for c in candidates):
+        complete = False
+    pre_powell = {}
+    for c in sorted((c for c in candidates if c['source'] != 'powell'), key=lambda c:(c['value'],c['u'],c['beta'])):
+        pre_powell.setdefault((c['u'],c['beta']),c)
+    for a, start in zip((a for a in attempts if a['source']=='powell'), list(pre_powell.values())[:2]):
+        if a.get('start_candidate_id') != start['candidate_id'] or a['route'] != start['route']:
+            raise ValueError('Powell did not inherit its selected starting candidate lineage')
+    return complete
 
 
 def verify_reference(row, family, replicate):
@@ -106,7 +177,8 @@ def verify_reference(row, family, replicate):
             raise ValueError('Grid/local candidates cannot manufacture the independent DE route')
         if c['source'].startswith('de_') and (c['route'] != 'B' or c.get('seed') != seed('de1' if c['source'].endswith('1') else 'de0', family, replicate)):
             raise ValueError('DE candidate lineage/seed mismatch')
-    mandatory = not row.get('unresolved_reason') and bool(reference.get('refined')) and bool(reference.get('full_bundle'))
+    mandatory = verify_attempts(reference, bound['objective_identity'])
+    mandatory = mandatory and not row.get('unresolved_reason') and bool(reference.get('refined')) and bool(reference.get('full_bundle'))
     for level, source, count in [(0, 'grid', 4), (1, 'fine_grid', 8)]:
         axes = grid_axes(BY_NAME['B00'], 128, level)
         grid = [c for c in candidates if c['source'] == source]
@@ -143,7 +215,7 @@ def verify_reference(row, family, replicate):
                 raise ValueError('DE seed or independent route substituted')
         elif source != 'powell' and a.get('route') != 'A':
             raise ValueError('Grid local attempt route changed')
-        if a.get('interrupted') not in (None, 'AttemptLimit'):
+        if a.get('interrupted') is not None:
             mandatory = False
     faces = row.get('faces', [])
     wanted = {(level, axis, endpoint) for level in (0, 1) for axis in (0, 1) for endpoint in BY_NAME['B00'].bounds[axis]}
@@ -173,6 +245,17 @@ def verify_reference(row, family, replicate):
         if ([b['bounds'] for b in actual] != ([] if flat else brackets)
             or any(not b['complete'] or not 0 < b['calls'] <= 60 for b in actual)):
             mandatory = False
+        by_id = {c.get('candidate_id'):c for c in candidates}
+        for bracket in actual:
+            observations = bracket.get('observations', [])
+            if len(observations)!=bracket['calls'] or len(set(observations))!=len(observations):
+                mandatory = False
+            for cid in observations:
+                c=by_id.get(cid)
+                if (not c or c['source']!='face_scalar' or c['route']!='A'
+                    or (c['u'],c['beta'])[face['axis']]!=face['fixed']
+                    or not bracket['bounds'][0] <= (c['u'],c['beta'])[1-face['axis']] <= bracket['bounds'][1]):
+                    raise ValueError('Boundary bracket observation substituted or missing')
     if not mandatory:
         return None, integrity
     if not all(any(c['route'] == route for c in candidates) for route in ('A', 'B')):
@@ -196,6 +279,21 @@ def verify_reference(row, family, replicate):
     wanted_controls += [('direct_expm', p) for p in product((0., 2*np.pi), (0., np.pi))]
     winners = [min((c for c in candidates if c['route'] == route), key=lambda c: (c['value'], c['u'], c['beta'])) for route in ('A', 'B')]
     winners += [min(candidates, key=lambda c: (c['value'], c['u'], c['beta']))]
+    # Bind the three required roles separately, including repeated winners.
+    required_fresh = [(kind, role, c['candidate_id']) for role,c in zip(('route_a','route_b','selected'), winners)
+                      for kind in ('direct_expm','candidate_reevaluation')]
+    actual_fresh = [(c['kind'], c.get('winner_role'), c.get('candidate_id')) for c in controls if c.get('winner_role')]
+    if Counter(actual_fresh) != Counter(required_fresh):
+        mandatory = False
+    by_id = {c['candidate_id']:c for c in candidates}
+    for check in controls:
+        if check['kind'] == 'candidate_reevaluation' or check.get('winner_role'):
+            c = by_id.get(check.get('candidate_id'))
+            if c is None or tuple(check['point']) != (c['u'],c['beta']):
+                raise ValueError('Fresh control substituted its candidate identity/coordinates')
+            if check['kind'] == 'candidate_reevaluation' and (
+                check.get('value') != c['value'] or check['error'] != abs(check['checked_value']-c['value'])):
+                raise ValueError('Fresh reevaluation differs from the original candidate value')
     wanted_controls += [(kind, (c['u'], c['beta'])) for c in winners for kind in ('direct_expm', 'candidate_reevaluation')]
     wanted_controls += [('cyclic_transport', p) for p in product(np.linspace(0., 2*np.pi, 5), np.linspace(0., np.pi, 5))]
     observed = Counter((c['kind'], tuple(c['point'])) for c in controls)
