@@ -34,9 +34,7 @@ Stage 7N was a post hoc, read-only analysis of a small development dataset, not 
 | --- | --- |
 | Independent QUBOs | **8**, comprising two per each of four families; `n=6, k=3` |
 | Landscape records | **192**, of which **19** were unresolved |
-| Equal-spectrum exploratory graph pairs | 17 reported; 16 complete |
 | High exchange RMS versus its shuffled control under uniform initialization | High RMS favored in **7/7 eligible comparisons**; one additional comparison was unresolved |
-| Low exchange RMS versus its shuffled control under uniform initialization | Low RMS favored in **1/6 eligible comparisons** |
 
 **Interpretation limits:** comparisons within one QUBO are dependent; the eight QUBOs, not landscape rows, are the independent sampling units. Graph shuffling altered more than the isolated cost-alignment treatment and therefore did not identify RMS as a unique causal mediator. The exploratory numerical references may share finite-search blind spots. Observed direction, missingness and source-selection rules prevent any claim of independent validation or generality. The high/low directions were hypothesis-generating, not a frozen success claim.
 
