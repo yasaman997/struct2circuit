@@ -1,166 +1,96 @@
 # Struct2Circuit
 
-**Project overview:** Struct2Circuit studies whether information in a cardinality-constrained QUBO can be used as side information when choosing a sparse, feasibility-preserving XY mixer topology under a fixed edge budget.
+**A controlled test of cost–mixer alignment in constrained QAOA.** Does assigning the same sparse XY mixer graph to different variables of a fixed QUBO change shallow variational performance in a way a pre-optimization structural score can predict?
 
-## Current research question
+The starting point was a falsification: a mixer built from strong `|Q_ij|` interactions performed well in one pilot family but **lost to a ring in 17/24 instances** of the first independent family. The resulting research question is not whether every problem-informed mixer wins; it is **which properties of feasible cost changes, if any, help select useful constrained quantum dynamics**.
 
-> **Can a transparent pre-optimization instance descriptor select a sparse constrained mixer topology that improves shallow variational optimization over structure-agnostic connected topologies, and under what conditions does that relationship fail?**
+**Current status — October 2026:** The prospective **32-QUBO, matched-C6 alignment experiment is implemented and merged, but NOT EXECUTED**. There is no established conditional-exchange-RMS performance advantage, certified optimum ordering, scalability claim, or quantum advantage.
 
-The historical first descriptor was the magnitude of off-diagonal QUBO interactions, `|Q_ij|`. The current mechanism candidate is exact fixed-cardinality conditional exchange RMS, with mean and variance retained separately. Neither low-RMS nor high-RMS selection has an established QAOA performance advantage.
+## Evidence: observation → falsification → mechanism question
 
-For a cardinality-constrained QUBO:
+| Stage | What was observed | What it establishes |
+| --- | --- | --- |
+| **Pilot** | On 24 block-correlated QUBOs (`n=8, k=3, p=1`), the original eight-edge strong-`|Q_ij|` mixer beat the ring on **17/24**; median normalized gap **0.101715 vs. 0.112558**. | A hypothesis-generating signal on one synthetic family. |
+| **Independent family** | On 24 weighted densest-k-subgraph instances (`n=9, k=4, p=1`), the same heuristic **lost on 17/24**; median gap **0.488890 vs. 0.476476** for ring. | **Failed generalization.** High correspondence with interaction magnitudes did not imply better depth-one outcomes. |
+| **Mechanistic correction** | A feasible XY exchange changes the cost according to diagonal and linear terms and *differences* between interaction rows. The direct `Q_ij x_i x_j` contribution cancels. | Raw `|Q_ij|` is not itself the energy difference induced by the exchange. An exact conditional exchange statistic is the next candidate descriptor. |
 
-**Minimize:** `C_Q(x)`  
-**Subject to:** `Σᵢ xᵢ = k`
+Primary navigable evidence: [pilot report](results/pilot_report.md), [independent DKS report](results/independent_dks_benchmark_v1.md), and [historical result qualifications](results/README.md).
 
-with `x ∈ {0, 1}ⁿ`. The mixer uses XY exchanges, so the simulation remains exactly inside the fixed-weight feasible subspace.
+Two additional **development-only** findings inform the new study but do not validate it. The frozen P33 numerical calibration **FAILED** (2/192 landscape discrepancies, 19/192 unresolved references; nine dependent contrast discrepancies). A later **post hoc eight-QUBO** mechanism analysis observed a high-RMS advantage over its shuffled comparator in 7/7 eligible uniform-initialization comparisons, with one comparison unresolved. Neither result is an independent prospective confirmation. The underlying P33/Stage 7N records are archived outside GitHub; the [development-evidence audit](docs/DEVELOPMENT_EVIDENCE_AUDIT.md) gives the disclosed counts, archive/hash pointers, and **explicit limits on third-party verification**. It is an evidence inventory, not a reproduction of unavailable raw data.
 
-## What has been learned
+## Mathematical question: a meaningful exchange statistic is not a performance theorem
 
-### 1. Exploratory pilot
+For symmetric `Q`, cardinality constraint `Σ_i x_i=k`, and `C(x)=xᵀQx+cᵀx`, exchanging occupied `i` with unoccupied `j` gives
 
-The original pilot used 24 synthetic block-correlated QUBOs with `n=8`, `k=3`, `p=1`, and an eight-edge structure-conditioned mixer versus an eight-edge ring mixer.
+```text
+ΔC_ij(x) = Q_jj − Q_ii + c_j − c_i
+           + 2 Σ_(ℓ ≠ i,j) x_ℓ (Q_jℓ − Q_iℓ).
+```
 
-The structure-conditioned rule won 17/24 instances and reduced the median normalized gap from `0.112558` to `0.101715`.
+The present score starts with the conditional exchange RMS
 
-This was a useful hypothesis-generating result, but it was one synthetic family and did not establish generalization.
+```text
+ρ_ij = sqrt(E[(ΔC_ij)^2 | x_i=1, x_j=0, Σ_i x_i=k]),
+```
 
-### 2. First independent test
+where expectation is taken over the **uniform feasible prior**. Its conditional mean and variance are calculable directly from `Q`, `c`, and `k`, **before** simulating or optimizing a quantum circuit. Unlike `|Q_ij|`, it explicitly reflects feasible exchange-cost differences.
 
-A fresh weighted densest-k-subgraph family was then evaluated with 24 instances, `n=9`, `k=4`, `p=1`, a nine-edge budget, eight random connected mixer replicates per instance, and an inverse-`|Q_ij|` control.
+**Established mathematically:** the exchange identity and conditional moments; C6 graph relabelings preserve unlabeled topology, feasible-space mixer spectrum, and the uniform feasible state.
 
-The original strong-`|Q_ij|` rule did **not** reproduce the pilot effect:
+**Not established:** that a large RMS produces a better optimized p=1 objective, that RMS is the sole mediator, or that high-versus-low improvement would generalize. RMS is not a quantum transition probability. In fact, short-angle expansions of the positive-sign XY mixer can connect **squared** exchange-cost differences to an initially *uphill* objective slope at small positive cost/mixer angles. That is a reason to investigate finite-angle interference and optimizer behavior, **not** a proof for either score direction. The frozen prospective experiment tests a declared directional prediction; its design is not revised on the basis of this observation.
 
-| Mixer | Median normalized gap |
-| --- | ---: |
-| Inverse-`|Q_ij|` control | **0.472628** |
-| Ring | **0.476476** |
-| Random connected mean | **0.485262** |
-| Strong-`|Q_ij|` structure | **0.488890** |
+The motivating chain remains a **hypothesis**:
 
-The structure rule lost to the ring on 17/24 instances. Its interaction-weight alignment was nevertheless very high, showing that high correspondence with the QUBO interaction graph was not sufficient for better depth-one QAOA performance on this family.
+`cost descriptor → relative graph assignment → feasible-state quantum dynamics → finite-angle objective landscape → observed empirical reference`
 
-This is treated as a **negative generalization result**, not as something to tune away.
+Read the [mechanism derivation](docs/MECHANISM_HYPOTHESIS.md) and [literature positioning](docs/LITERATURE_DIFFERENTIATION.md). The scientific focus is more specific than proposing another generic custom mixer.
 
-Start with the [historical-results status note](results/README.md), which places the preserved pilot advancement decision in context. See [results/independent_dks_benchmark_v1.md](results/independent_dks_benchmark_v1.md) for the full exploratory analysis. No larger confirmatory benchmark is currently authorized or frozen.
+## Prospective experiment: why a six-vertex ring?
 
-## The important experimental correction
+At `n=6, k=3`, the constrained Hilbert space has `C(6,3)=20` basis states. This deliberately **small, classically tractable** case supports exhaustive graph-orbit construction, transported-Hamiltonian identities, exact state-vector controls, and tight numerical-provenance checks. It is a **mechanism laboratory**, not a demonstration that quantum hardware solves hard instances.
 
-The original comparisons used the same uniform feasible initial state for every mixer. That is a clean fixed-initialization comparison, but it does not isolate topology from mixer/initial-state alignment.
+The experiment keeps the QUBO fixed and selects two assignments of the **same six-cycle** mixer: high versus low conditional exchange-RMS alignment. Relabeling the graph changes its edges relative to the cost variables, while preserving topology, spectrum, XY edge weights, uniform initial state, `p=1`, and the B00 parameter domain.
 
-Recent constrained-QAOA work makes this a scientifically relevant control. The simulator now supports:
+| Frozen design element | Prespecified choice |
+| --- | --- |
+| Independent problem draws | **32 fresh QUBOs**, eight from each of four families |
+| Candidate graph assignments | **720** permutations → **60** labeled C6 graphs; exact cost symmetries quotient equivalent assignments |
+| Pairing | Highest versus lowest rounded alignment scores, selected **before any QAOA evaluations** |
+| Primary contrast | `Δ = r_high − r_low`; a material high-alignment win requires both empirical references complete and `Δ < −0.00012` |
+| Inference | **W ≥ 24** of 32 for directional support; **W + U ≤ 8** for contradiction of the prespecified majority prediction; otherwise inconclusive |
+| Measurement safeguards | Two independent reference routes, mandatory fine/boundary/controls, conserved 32-unit denominator, missingness, linked numerical admissions and evidence; 20,000 evaluations/arm and 3,600 cumulative CPU-seconds |
 
-- `uniform`: uniform superposition over feasible weight-`k` states;
-- `mixer_low`: deterministic opposite-extremum sensitivity condition in the lowest mixer eigenspace;
-- `mixer_high`: positive-amplitude Perron–Frobenius reference in the highest mixer eigenspace for connected mixers.
+This comparison isolates the **selection-rule contrast within fixed C6**; it does **not** establish superiority over a random C6 assignment or a structure-agnostic algorithm. Even a positive finding would be about **finite numerical references**, not globally certified B00 minima. Incomplete arms remain unknown rather than excluded or rerun with expanded budgets.
 
-The implemented XY Hamiltonian has positive exchange amplitudes, so `mixer_high` is equivalently the ground state of `-H_M`. The spectral projector construction is deterministic; its fallback when uniform overlap vanishes can depend on variable labels. Neither extremum guarantees better QAOA performance. Their overlap with the uniform state is measured separately. These modes diagnose sensitivity to the topology/initialization pairing; they do **not** by themselves isolate a pure topology effect.
+**[Frozen scientific design](paper/controlled_mixer_alignment_v1.md)** · [experiment implementation/authorization guide](src/struct2circuit/alignment_experiment/README.md) · [entry point](experiments/run_controlled_alignment.py).
 
-`experiments/run_alignment_control.py` implements this diagnostic. **No initialization-diagnostic result has yet been folded into the main claim.**
+**Execution boundary:** No official panel generated, no experiment executed, and no protected validation-holdout data accessed. Running it requires a separate operational preflight and explicit persisted authorization. A merged implementation or successful test suite is **not** that authorization.
 
-## Mechanism hypothesis
+## Software, ownership, and reproducibility
 
-The first local intuition—“large `|Q_ij|` makes the corresponding exchange favorable”—is not correct. For a single feasible exchange, the direct `Q_ij x_i x_j` contribution cancels.
+This independent project includes exact feasible-subspace QAOA, constrained QUBO generators, ring/random/instance-conditioned XY mixers, three initialization diagnostics (`uniform`, `mixer_low`, `mixer_high`), dimensionless cost-angle treatment, and numerical-integrity/provenance tests. Changing a topology-dependent initial state is **not** interpreted as a pure topology intervention.
 
-The remaining hypothesis is graph-level:
+The scientific contribution being developed is the **question and experimental test** of a coefficient-only cost–mixer alignment rule under controlled dynamics. This repository does not establish a new optimal mixer, universal algorithm, hardware-effective circuit, or asymptotic speedup. Repository history records code and decisions; it does not by itself verify the division of intellectual contributions among any outside assistance, tools, or collaborators. Contributions and external assistance should be described accurately in any application or manuscript.
 
-`instance descriptor → mixer topology → feasible-state transition graph → variational dynamics → optimization outcome`
-
-The current candidate is the exact conditional RMS exchange cost under uniformly sampled feasible states with `x_i=1`, `x_j=0`, and weight `k`. It uses `Q`, `c`, and `k`; conditional mean and variance remain separately available for interpretation. The former norm of exchange coefficients is not this fixed-`k` statistic and is no longer the primary score. Low-RMS and high-RMS topologies are competing hypotheses, with neither direction validated by these repairs.
-
-See [docs/MECHANISM_HYPOTHESIS.md](docs/MECHANISM_HYPOTHESIS.md).
-
-## Literature position
-
-The project sits at the intersection of constrained QAOA, XY-mixer topology, instance-informed circuit design, and problem-structure/algorithm interaction.
-
-It does **not** claim novelty for constrained mixers, custom mixers, architecture search, adaptive mixer allocation, or trainability theory. The narrow empirical question is whether a transparent pre-optimization instance descriptor can select a sparse XY topology under a matched construction budget.
-
-See [docs/LITERATURE_DIFFERENTIATION.md](docs/LITERATURE_DIFFERENTIATION.md).
-
-## Implementation
-
-Implemented:
-
-- cardinality-constrained QUBO definitions and generators;
-- exact fixed-weight feasible-subspace simulation;
-- fixed, random-connected, and structure-conditioned mixer graphs;
-- explicit uniform/low-spectrum/high-spectrum initialization diagnostics;
-- deterministic p=1 parameter optimization with feasible-cost-span scaling for new studies and a legacy mode for historical reproduction;
-- paired exploratory analysis;
-- reproducible independent benchmark scripts;
-- invariant and mechanism tests;
-- benchmark manifests and integrity safeguards.
-
-## Current status
-
-**Exploratory research; mechanism-control stage.**
-
-The strong-`|Q_ij|` rule has failed to generalize to the first independent family. The next experiment is therefore **not** another large confirmatory benchmark.
-
-The planned study compares historical strong/weak `|Q_ij|`, low/high conditional exchange RMS, shuffled controls, and random topology under all three initialization conditions. New mechanism-stage runs use the dimensionless coordinate `u = gamma * (C_max-C_min)` on `[0,2*pi]` for the grid and both local solvers; returned gamma is `u/(C_max-C_min)`. Centered, normalized costs remove objective-unit dependence from solver tolerances. This interval is a predeclared scale convention, not a fundamental period; the common beta interval `[0,pi]` is also a comparison convention. Historical pilot and independent DKS scripts explicitly retain `gamma_scale="legacy"`.
-
-Normalized costs use compensated summation of the represented QUBO coefficients, preventing cancellation noise from becoming an artificial landscape. Tiny resolved spans remain nonconstant without an absolute unit cutoff. For a resolved objective, `probability_optimum` sums probability only on states whose compensated float64 cost equals the minimum exactly, before normalization; it applies no near-optimum tolerance. Final cost rounding can still create numerical ties. If all accurately summed costs are indistinguishable, `cost_status="constant_or_unresolved"` withholds normalized gap and optimum probability (`None`, JSON `null`, or blank CSV). A proven constant objective has optimum probability one; it is withheld here because constant and unresolved cases are intentionally combined. Raw legacy phases and expectations are unchanged. Historical summaries retain all raw rows and validate declared instance IDs, required comparators, and every summarized outcome, including optimum probability. Incomplete comparisons fail with affected/expected counts. The optimizer reports the selected candidate's source and status separately from each solver's status; `finite_objective` means only finite final expectation.
-
-QUBO construction and exchange descriptors share an absolute symmetry check: `rtol=0`, `atol=1e-12`, without symmetrizing inputs. Exact descriptor identities assume symmetric `Q`; accepted small asymmetry is input tolerance, not a relative-accuracy guarantee for tiny objectives. Stored historical results are preserved; recomputing their probability metrics under minimum equality may change values previously obtained with the near-optimum mask.
-
-`CardinalityQUBO` requires finite square `Q` with at least two variables and a finite one-dimensional length-`n` vector `c`. It accepts Python and NumPy integer scalar cardinalities with `0 < k < n`, stores `k` as a Python integer, and rejects booleans and floats at construction.
-
-The reported `expectation` always averages the legacy raw NumPy QUBO costs, in raw units, including after `feasible_span` optimization. Compensated costs instead define the extrema, span, normalized dynamics, `normalized_gap`, and optimum mask. Cancellation and rounding can make `(expectation-C_min)/(C_max-C_min)` disagree with the reported gap; the gap is computed by averaging normalized compensated costs directly. A finite raw expectation does not certify accuracy of that raw arithmetic. No separately named compensated-expectation field is added.
-
-This repair makes no new performance claim. The next scientific phase is a small, predeclared gamma/beta-domain and optimizer calibration. Controlled mechanism comparisons follow calibration.
-
-The statistical sensitivity and pre-freeze machinery already in the repository is retained for reproducibility and later use. It is not the current scientific bottleneck, and no final sample-size or confirmatory-analysis claim is being made from the existing smoke runs.
-
-## Reproducibility
+Set up a development environment and run regression tests (**no official experiments**):
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 python3 -m pip install -e .
-python3 -m unittest discover -s tests -v
+python3 tests/run_calibration_regressions.py
 ```
 
-Optional historical pilot reproduction, writing outside the preserved results:
+The controlled experiment's default command prints metadata only, without generating QUBOs:
 
 ```bash
-python3 experiments/run_pilot.py --instances 24 --n 8 --k 3 --output /tmp/struct2circuit-pilot-reproduction
+python3 experiments/run_controlled_alignment.py
 ```
 
-The pilot and independent DKS scripts check every destination before simulation and refuse existing artifacts. Select a fresh output directory with `--output`; existing directories containing only unrelated files are allowed, and those files are preserved. Alignment output is a filename and uses the same collision check. The checks require no Git metadata and provide no overwrite flag.
+At the merged implementation revision, CI reported **440 tests run, 2 skipped, 0 failures**. These tests verify software behavior, not experimental qualification or the proposed hypothesis. Official numerical execution has separately pinned runtime and authorization conditions: consult the [experiment guide](src/struct2circuit/alignment_experiment/README.md).
 
-Alignment control:
+## Claim boundary
 
-```bash
-python3 experiments/run_alignment_control.py --instances 24 --n 9 --k 4
-```
+The first strong-`|Q_ij|` heuristic **failed its independent-family check**. The conditional-RMS mechanism hypothesis remains **prospective and untested**. A negative, mixed, or inconclusive controlled outcome must be reported as faithfully as a positive one. Beyond the present study, evaluation of practical selection value would require appropriate structure-agnostic comparators and tests across larger systems and other graph families; these are **not** retroactive additions to the frozen design.
 
-The alignment-control command generates new exploratory records; it does not modify or overwrite the existing independent benchmark results. It requires `--edge-budget` to match the actual ring edge count and records actual counts. It compares ring, historical strong-`|Q|`, and random topologies across initializations; it is not yet the planned conditional-RMS mechanism study.
-
-## Repository map
-
-```text
-src/struct2circuit/
-    problems.py       Cardinality-QUBO definitions and generators
-    mixers.py         Fixed, random, and structure-conditioned mixer graphs
-    simulator.py      Exact feasible-subspace QAOA + initialization controls
-    optimize.py       Deterministic parameter optimization
-    analysis.py       Exploratory statistics and reporting
-    benchmark.py      Benchmark manifest construction and blind guards
-    sensitivity.py    Statistical sensitivity tooling
-experiments/
-    run_pilot.py
-    run_independent_dks_benchmark.py
-    run_alignment_control.py
-results/
-docs/
-paper/
-tasks/
-tests/
-```
-
-## Research principle
-
-The repository distinguishes an interesting observation from a validated method.
-
-> **The goal is not to prove that structure-conditioned mixers work. The goal is to determine whether problem structure contains useful information for constrained circuit design, identify the mechanism if it does, and record clearly where a proposed mapping fails.**
+> **Research principle:** The objective is not to make a structure-conditioned mixer win. It is to find out when—and why—problem information does or does not improve constrained quantum dynamics.
