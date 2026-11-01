@@ -14,7 +14,7 @@ The starting point was a falsification: a mixer built from strong `|Q_ij|` inter
 | **Independent family** | On 24 weighted densest-k-subgraph instances (`n=9, k=4, p=1`), the same heuristic **lost on 17/24**; median gap **0.488890 vs. 0.476476** for ring. | **Failed generalization.** High correspondence with interaction magnitudes did not imply better depth-one outcomes. |
 | **Mechanistic correction** | A feasible XY exchange changes the cost according to diagonal and linear terms and *differences* between interaction rows. The direct `Q_ij x_i x_j` contribution cancels. | Raw `|Q_ij|` is not itself the energy difference induced by the exchange. An exact conditional exchange statistic is the next candidate descriptor. |
 
-Primary navigable evidence: [pilot report](results/pilot_report.md), [independent DKS report](results/independent_dks_benchmark_v1.md), and [historical result qualifications](results/README.md).
+Primary navigable evidence: [pilot report](results/pilot_report.md), [independent DKS report](results/independent_dks_benchmark_v1.md), and [historical result qualifications](results/README.md). **Historical data caveat:** the independent DKS instance CSV has three sign-reversed *header names* (not reversed numeric comparisons); read the [schema erratum](results/independent_dks_schema_erratum.md) before reusing its paired-difference columns. New generator output uses corrected names; archived values remain untouched.
 
 Two additional **development-only** findings inform the new study but do not validate it. The frozen P33 numerical calibration **FAILED** (2/192 landscape discrepancies, 19/192 unresolved references; nine dependent contrast discrepancies). A later **post hoc eight-QUBO** mechanism analysis observed a high-RMS advantage over its shuffled comparator in 7/7 eligible uniform-initialization comparisons, with one comparison unresolved. Neither result is an independent prospective confirmation. The underlying P33/Stage 7N records are archived outside GitHub; the [development-evidence audit](docs/DEVELOPMENT_EVIDENCE_AUDIT.md) gives the disclosed counts, archive/hash pointers, and **explicit limits on third-party verification**. It is an evidence inventory, not a reproduction of unavailable raw data.
 
@@ -87,7 +87,7 @@ The controlled experiment's default command prints metadata only, without genera
 python3 experiments/run_controlled_alignment.py
 ```
 
-At the merged implementation revision, CI reported **440 tests run, 2 skipped, 0 failures**. These tests verify software behavior, not experimental qualification or the proposed hypothesis. Official numerical execution has separately pinned runtime and authorization conditions: consult the [experiment guide](src/struct2circuit/alignment_experiment/README.md).
+At the merged implementation revision, CI reported **440 tests run, 2 skipped, 0 failures**. These tests verify software behavior, not experimental qualification or the proposed hypothesis. **The regular CI job runs Python 3.11 with unpinned dependency versions; it is not a qualification run under the controlled experiment's frozen Python 3.12.14 / NumPy 2.5.3 / SciPy 1.18.1 environment.** Official numerical execution has separately pinned runtime and authorization conditions: consult the [experiment guide](src/struct2circuit/alignment_experiment/README.md).
 
 ## Claim boundary
 
