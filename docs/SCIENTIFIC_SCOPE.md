@@ -23,11 +23,13 @@ The [historical-results status note](../results/README.md) explains why the orig
 
 These are mathematical and software properties, not performance evidence for the conditional-RMS candidate.
 
-## Untested hypotheses and next phase
+## Untested hypotheses and current prospective study
 
-Numerical calibration is the next scientific phase. It must precede a mechanism-performance study; passing regression tests does not substitute for calibration. No large confirmatory benchmark has been authorized or frozen.
+The historical P33 numerical calibration **FAILED** (171 passed, 2 failed, 19 unresolved of 192 landscapes). The post hoc Stage 7N observation that high RMS outperformed its shuffled comparator in 7/7 eligible comparisons (one unresolved) is exploratory; its underlying raw records are not distributed here. See the [development-evidence audit](DEVELOPMENT_EVIDENCE_AUDIT.md). Passing regression tests does not repair failed empirical references.
 
-The current questions are whether either RMS direction predicts useful mixer transitions, whether mean and variance help interpret any observed effect, and whether that effect survives all three initialization conditions and declared comparison controls.
+The [frozen two-arm C6 study](../paper/controlled_mixer_alignment_v1.md) is **implemented but NOT EXECUTED**. It compares high and low RMS assignments of the **same** fixed six-cycle mixer on 32 fresh QUBOs, holding topology, spectrum and uniform initialization fixed. There is no random C6 assignment arm in that protocol, and no large confirmatory benchmark is authorized. A three-arm variant would be a new design subject to separate review, not a correction silently applied to the frozen study.
+
+The wider questions remain whether either RMS direction predicts useful transitions, whether mean and variance explain any observed effect, and whether the observation survives appropriate structure-agnostic and initialization controls in later studies.
 
 ## Later questions
 

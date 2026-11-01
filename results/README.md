@@ -15,11 +15,13 @@ Strong `|Q_ij|` is a historical comparator, not the primary mechanism candidate.
 
 The simulator supports `uniform`, `mixer_low`, and `mixer_high`. With positive-sign XY exchange amplitudes, `mixer_high` has the Perron–Frobenius positive-amplitude interpretation for connected mixers; the low extremum is a sensitivity control. These conditions diagnose initialization sensitivity without guaranteeing an improvement or isolating a pure topology effect.
 
-**Numerical calibration is the next scientific phase.** Regression validation is not performance evidence. The project has not demonstrated quantum advantage, hardware advantage, learned architecture discovery, or improved trainability. See the [scientific scope](../docs/SCIENTIFIC_SCOPE.md), [mechanism hypothesis](../docs/MECHANISM_HYPOTHESIS.md), and [research protocol](../paper/research_protocol.md) for the current claim boundary and plans.
+**The later P33 development calibration FAILED** (2 failed and 19 unresolved references of 192); Stage 7N's high-RMS exploratory comparison is nonconfirmatory and not independently reproducible from this GitHub checkout. The fixed-C6 32-QUBO high-versus-low assignment experiment is **implemented but NOT EXECUTED**. Regression validation is not performance evidence. See the [development-evidence audit](../docs/DEVELOPMENT_EVIDENCE_AUDIT.md), [frozen C6 design](../paper/controlled_mixer_alignment_v1.md), and [scientific scope](../docs/SCIENTIFIC_SCOPE.md). There is no demonstrated quantum or hardware advantage, learned architecture discovery, or improved trainability.
 
 ## Metric provenance and preservation
 
-All previously stored reports, CSV/JSON records, and the PNG figure are left unchanged. In particular, this semantics repair does not regenerate the pilot or independent DKS results, rewrite their statistics, or change their experimental conclusions.
+**Historical DKS CSV erratum:** In the preserved `independent_dks_benchmark_v1_instances.csv`, the three columns called `structure_minus_*` contain **baseline minus structure**, contrary to their names. Read the [schema/sign erratum](independent_dks_schema_erratum.md) before analyzing those columns. The generator now uses correctly named `*_minus_structure` headers for *new* output only; the archived CSV is not changed.
+
+The numerical tables and conclusions in the historical reports, the CSV/JSON records, and the PNG figure remain unchanged. The independent DKS report's explanatory prose now links this erratum and labels its former next-step proposal as historical; no measurement values were rewritten. In particular, this semantics repair does not regenerate the pilot or independent DKS results, rewrite their statistics, or change their experimental conclusions.
 
 The pilot and independent DKS entry points preflight every output destination and refuse existing artifacts before simulation. To reproduce them, explicitly select a fresh directory with `--output`; unrelated files in that directory are preserved. The alignment entry point applies the same check to its output filename. There is no overwrite option, automatic random path, or dependency on Git metadata.
 

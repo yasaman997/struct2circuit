@@ -60,19 +60,15 @@ optimization outcome
 
 The missing link is the transition-graph mechanism. See [docs/MECHANISM_HYPOTHESIS.md](docs/MECHANISM_HYPOTHESIS.md).
 
-## Current next step
+## Current status and next decision (November 2026)
 
-Do **not** start another large confirmatory benchmark yet.
+**The P33 numerical calibration FAILED**, with 2 failed and 19 unresolved references among 192 landscapes; see the [development-evidence audit](docs/DEVELOPMENT_EVIDENCE_AUDIT.md). Its reference schedules are not qualified. The later Stage 7N high-RMS-versus-shuffled signal (7/7 eligible comparisons, one unresolved) was **post hoc and exploratory**, with raw records outside this repository; it does not validate the descriptor.
 
-The next scientific phase is a small, predeclared gamma/beta-domain and optimizer calibration. Controlled mechanism comparisons follow it; no large confirmatory benchmark is authorized or frozen.
+A subsequent **32-QUBO fixed-C6 high/low alignment experiment** has an approved, [frozen two-arm design](paper/controlled_mixer_alignment_v1.md) and [implemented code](src/struct2circuit/alignment_experiment/README.md), but it is **NOT EXECUTED**. It compares high versus low conditional-RMS assignments of the same six-cycle graph at `n=6, k=3`; this controls graph topology and spectrum but does **not** test against a random assignment. No official panel has been generated and no authorization to execute is implied by the implementation or passing tests.
 
-The planned study compares historical strong/weak `|Q_ij|` with low/high exact conditional exchange RMS at fixed `k`, plus shuffled and random controls. Conditional mean and variance are retained separately; the former coefficient norm is no longer the primary descriptor. Low/high are competing hypotheses. All three initialization conditions are reported.
+An alternative H/L/R design and broader comparisons remain scientific proposals, **not changes to the frozen protocol**. They require independent review and a separately approved study. Do not turn the original calibration plan, earlier five-comparator list, or any exploratory result into a retrospective modification of the C6 design.
 
-New runs optimize `u = gamma * (C_max-C_min)` on `[0,2*pi]`, with centered normalized costs and identical bounds for the grid and both local solvers. Returned gamma remains in physical units. This gamma interval and the shared beta interval `[0,pi]` are declared comparison conventions, not universal periods. Both historical entry points explicitly retain `legacy` gamma semantics. No scientific domain calibration or new performance claim accompanies these repairs.
-
-Normalized costs use compensated coefficient summation without an absolute unit cutoff. For resolved objectives, optimum probability uses exact minimum equality of those float64 costs before normalization, with no near-optimum tolerance. Final cost rounding can still produce numerical ties. If no distinct costs remain, the combined constant/unresolved status withholds normalized gap and optimum probability as JSON `null` or blank CSV. Optimum probability would be one for a proven constant; the combined policy intentionally does not make that distinction. Raw legacy arithmetic is preserved. Recomputed probability metrics may differ from historical values; stored results are not rewritten. All raw rows are retained, and summaries validate declared instance IDs, comparators, and every summarized outcome, including optimum probability; refusals report affected/expected counts. Alignment runs enforce the actual ring edge budget and record actual edge counts.
-
-The repository already contains statistical sensitivity and pre-freeze infrastructure. Those tools remain available for a later confirmatory study; they are not the current scientific bottleneck.
+For implementation semantics (legacy versus normalized gamma, compensated cost metrics, withheld unresolved gaps, and initialization diagnostics), consult the [scientific scope](docs/SCIENTIFIC_SCOPE.md) and [experiment guide](src/struct2circuit/alignment_experiment/README.md). Future tests must preserve historical data and require fresh output paths. The [DKS CSV schema erratum](results/independent_dks_schema_erratum.md) explains the three misleading historical sign-column names; future regenerated summaries use corrected headers.
 
 ## Repository map
 
@@ -81,6 +77,9 @@ The repository already contains statistical sensitivity and pre-freeze infrastru
 - `docs/LITERATURE_DIFFERENTIATION.md` — closest literature and precise scope.
 - `results/README.md` — current interpretation and preservation policy for historical results.
 - `results/independent_dks_benchmark_v1.md` — first independent benchmark result.
+- `results/independent_dks_schema_erratum.md` — historical DKS paired-difference header/sign correction.
+- `docs/DEVELOPMENT_EVIDENCE_AUDIT.md` — disclosed P33 and Stage 7N observations and verification limits.
+- `paper/controlled_mixer_alignment_v1.md` — frozen prospective C6 design (not executed).
 - `experiments/run_alignment_control.py` — initialization/alignment control.
 - `src/struct2circuit/simulator.py` — exact feasible-subspace simulation and initialization modes.
 - `tests/` — mathematical and implementation invariants.

@@ -80,8 +80,41 @@ class ExperimentSmokeTests(unittest.TestCase):
             rows = self.read_rows(output / "independent_dks_benchmark_v1_raw.csv")
             self.assertEqual(len(rows), 16)
             self.assert_historical_semantics(rows)
-            self.assertEqual(len(self.read_rows(output / "independent_dks_benchmark_v1_instances.csv")), 4)
+            summaries = self.read_rows(output / "independent_dks_benchmark_v1_instances.csv")
+            self.assertEqual(len(summaries), 4)
+            # Regression for the original reversed "structure_minus_*" headers:
+            # for every future result, column name and subtraction must agree.
+            for row in summaries:
+                self.assertNotIn("structure_minus_ring", row)
+                for difference, baseline in (
+                    ("ring_minus_structure", "ring_gap"),
+                    ("random_mean_minus_structure", "random_mean_gap"),
+                    ("inverse_minus_structure", "inverse_structure_gap"),
+                ):
+                    self.assertIn(difference, row)
+                    self.assertAlmostEqual(
+                        float(row[difference]),
+                        float(row[baseline]) - float(row["structure_gap"]),
+                        places=7,
+                    )
             self.assertEqual(note.read_text(), "unrelated file must survive")
+
+    def test_preserved_dks_csv_has_documented_legacy_signs(self) -> None:
+        # The historical CSV is immutable; its three "structure_minus_*"
+        # columns actually store baseline minus structure. See the erratum.
+        rows = self.read_rows(ROOT / "results" / "independent_dks_benchmark_v1_instances.csv")
+        self.assertEqual(len(rows), 24)
+        for row in rows:
+            for misnamed, baseline in (
+                ("structure_minus_ring", "ring_gap"),
+                ("structure_minus_random_mean", "random_mean_gap"),
+                ("structure_minus_inverse", "inverse_structure_gap"),
+            ):
+                self.assertAlmostEqual(
+                    float(row[misnamed]),
+                    float(row[baseline]) - float(row["structure_gap"]),
+                    places=7,
+                )
 
     def test_constant_dks_retains_raw_rows_and_refuses_summary(self) -> None:
         # Every k=1 DKS cost is zero, regardless of sampled graph weights.

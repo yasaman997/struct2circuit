@@ -29,7 +29,7 @@ The seed namespace is separate from the original pilot and from the current draf
 
 ## Primary result
 
-Paired improvement is defined as baseline gap minus structure-conditioned gap, so positive values favor the proposed structure rule.
+Paired improvement is defined as baseline gap minus structure-conditioned gap, so positive values favor the proposed structure rule. **CSV schema erratum:** the archived `independent_dks_benchmark_v1_instances.csv` incorrectly labels these baseline-minus-structure values as `structure_minus_*`; see the [interpretation and corrected names](independent_dks_schema_erratum.md). The table and win/loss direction below use the stated baseline-minus-structure convention and do not need a sign reversal.
 
 | Comparison | Median paired improvement | 95% bootstrap interval | Wins / ties / losses |
 | --- | ---: | ---: | ---: |
@@ -94,9 +94,11 @@ The correct conclusion is therefore not “structure does not matter.” It is:
 
 That is a useful narrowing of the research question.
 
-## Next experiment
+## Historical next-step proposal (not the present approved protocol)
 
-Before freezing a large blind benchmark, compare a small mechanistic family of scores under the same construction budget:
+This list records the exploratory follow-up **proposed when the first independent benchmark was written**. It is not the comparator list for the later [frozen two-arm C6 study](../paper/controlled_mixer_alignment_v1.md), which is implemented and **NOT EXECUTED**. The intervening P33 numerical calibration **FAILED**; see the [development-evidence audit](../docs/DEVELOPMENT_EVIDENCE_AUDIT.md).
+
+At the time, the proposed plan was to compare a small mechanistic family of scores under the same construction budget:
 
 1. strong |Qij|;
 2. weak |Qij|;

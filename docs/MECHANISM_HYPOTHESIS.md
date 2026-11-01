@@ -72,7 +72,7 @@ The historical strong-`|Q_ij|` rule failed its first independent generalization 
 - weak/inverse/shuffled controls;
 - and a mechanistic analysis that identifies what transition-graph property is responsible.
 
-The independent negative result is retained. Low- and high-RMS are untested competing hypotheses; null, mixed, or negative results must also be retained rather than choosing a direction after observing performance. Numerical calibration precedes these mechanism comparisons.
+The independent negative result is retained. Low- and high-RMS remain unvalidated competing hypotheses; null, mixed, or negative results must also be retained rather than choosing a direction after observing performance. The later P33 numerical calibration **FAILED**, and a subsequent frozen C6 high/low study has been implemented but **NOT EXECUTED**. Neither the earlier calibration prerequisite nor a broader control list should be mistaken for the current approved C6 design.
 
 ## 6A. Concrete transition-level mechanism candidate
 
@@ -152,18 +152,10 @@ tie-breaking can break equivariance at exact ties. Low/high choices can also
 change degrees, bottlenecks, and spectra. Those are properties to measure, not
 evidence of a transition mechanism on their own.
 
-## 7. Next scientific experiment
+## 7. Frozen prospective comparison and earlier exploratory proposal
 
-The planned next experiment is small and mechanistic. Compare a predeclared set of structural signals under the same mixer edge budget and all three initialization conditions:
+The earlier proposal on this page named strong/weak `|Q_ij|`, low/high conditional RMS, shuffled-score and random-connected controls across three initialization modes. That remains a **broader exploratory research agenda**, not the registered treatment set for the subsequent C6 study. Its normalized-angle `u=gamma*(C_max-C_min)` and beta-box conventions also must not override the controlled study's own B00 domain.
 
-1. strong `|Q_ij|`;
-2. weak `|Q_ij|`;
-3. low/high conditional exchange RMS defined above;
-4. shuffled-score control;
-5. random connected topology.
+The current [frozen C6 design](../paper/controlled_mixer_alignment_v1.md) has **32 prospective QUBOs** at `n=6, k=3`, comparing the highest and lowest conditional-RMS alignments obtained by assigning the **same six-cycle mixer** to a fixed cost function. Graph topology, native mixer spectrum, uniform feasible initialization, depth and reference domain are matched. This tests the prespecified H-versus-L assignment contrast, **not** general superiority over a structure-agnostic mixer, and it does not independently identify RMS as the unique causal mediator. See the [controlled experiment implementation/authorization guide](../src/struct2circuit/alignment_experiment/README.md).
 
-The objective is to determine whether pre-optimization exchange statistics predict useful transitions within declared topology/initialization configurations. New optimization uses `u=gamma*(C_max-C_min)` on `[0,2*pi]` with normalized costs. This is a characteristic-scale convention, not a fundamental gamma period. The shared beta box `[0,pi]` is also a convention. Parameter-domain and optimizer-reference calibration remain prerequisites to interpreting new topology rankings; they are not part of this code-repair pass.
-
-The existing alignment script retains the historical strong-`|Q|` comparator and requires the actual ring edge count for all topologies. It is a sensitivity diagnostic, not the complete conditional-RMS mechanism study. No new scientific performance data or conclusion is supplied by these repairs.
-
-Only after that question is answered should a larger confirmatory cross-family benchmark be frozen.
+**Status: implemented, NOT EXECUTED.** The historical P33 calibration **FAILED** (2 failed and 19 unresolved of 192 landscapes); Stage 7N's small post hoc observations are exploratory and not a qualifying calibration. A proposed random-assignment third arm or any modified comparator/decision rule would require separately reviewed and approved design work, not an edit to this frozen protocol. A later cross-family benchmark remains outside the present authorized scope.
