@@ -20,7 +20,7 @@ The [independent benchmark report](independent_dks_benchmark_v1.md) already defi
 
 ## Forward compatibility and provenance
 
-- **Preserved:** `independent_dks_benchmark_v1_instances.csv`, the archived raw CSV, original report/figures, seeds, objective values, and all historical analyses. They are not regenerated or rewritten.
+- **Preserved:** `independent_dks_benchmark_v1_instances.csv`, the archived raw CSV, existing report's numerical tables and figures, seeds, objective values, and historical analyses. None of these quantitative artifacts was regenerated or overwritten. Explanatory prose in the independent DKS report now links this erratum and labels its former next-step proposal as historical.
 - **Corrected for future fresh runs:** `experiments/run_independent_dks_benchmark.py` now names all three output columns `*_minus_structure` while keeping the original baseline-minus-structure arithmetic. This is an intentional **header-only output-schema change**; it does not modify model, optimizer, instances, scores, or the paired sign convention.
 - **Compatibility warning:** Code consuming archived CSVs must explicitly map the three historical names to their actual `*_minus_structure` meaning. Code consuming new summaries should use the corrected names. Do not combine old and new CSVs by header without an explicit schema adapter.
 - **Regression checks:** `tests/test_experiment_smoke.py` checks both a freshly generated temporary summary's corrected headers/arithmetic and the preserved 24-row historical file's old headers/arithmetic. The synthetic smoke run is not the controlled C6 experiment.
