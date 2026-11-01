@@ -222,9 +222,13 @@ def main() -> None:
             "ring_gap": pivot["ring"],
             "random_mean_gap": random_mean,
             "inverse_structure_gap": pivot["inverse_structure"],
-            "structure_minus_ring": pivot["ring"] - pivot["structure"],
-            "structure_minus_random_mean": random_mean - pivot["structure"],
-            "structure_minus_inverse": pivot["inverse_structure"] - pivot["structure"],
+            # Positive differences favor structure (smaller normalized gap).
+            # The preserved 2026 CSV used the misleading names "structure_minus_*"
+            # for these baseline-minus-structure differences. Future outputs use
+            # names that agree with the actual subtraction; see the schema erratum.
+            "ring_minus_structure": pivot["ring"] - pivot["structure"],
+            "random_mean_minus_structure": random_mean - pivot["structure"],
+            "inverse_minus_structure": pivot["inverse_structure"] - pivot["structure"],
             "structure_alignment": raw[raw["method"] == "structure"].set_index("instance")["interaction_alignment"],
             "ring_alignment": raw[raw["method"] == "ring"].set_index("instance")["interaction_alignment"],
             "inverse_alignment": raw[raw["method"] == "inverse_structure"].set_index("instance")["interaction_alignment"],
