@@ -21,7 +21,7 @@ The simulator supports `uniform`, `mixer_low`, and `mixer_high`. With positive-s
 
 **Historical DKS CSV erratum:** In the preserved `independent_dks_benchmark_v1_instances.csv`, the three columns called `structure_minus_*` contain **baseline minus structure**, contrary to their names. Read the [schema/sign erratum](independent_dks_schema_erratum.md) before analyzing those columns. The generator now uses correctly named `*_minus_structure` headers for *new* output only; the archived CSV is not changed.
 
-All previously stored reports, CSV/JSON records, and the PNG figure are left unchanged. In particular, this semantics repair does not regenerate the pilot or independent DKS results, rewrite their statistics, or change their experimental conclusions.
+The numerical tables and conclusions in the historical reports, the CSV/JSON records, and the PNG figure remain unchanged. The independent DKS report's explanatory prose now links this erratum and labels its former next-step proposal as historical; no measurement values were rewritten. In particular, this semantics repair does not regenerate the pilot or independent DKS results, rewrite their statistics, or change their experimental conclusions.
 
 The pilot and independent DKS entry points preflight every output destination and refuse existing artifacts before simulation. To reproduce them, explicitly select a fresh directory with `--output`; unrelated files in that directory are preserved. The alignment entry point applies the same check to its output filename. There is no overwrite option, automatic random path, or dependency on Git metadata.
 
