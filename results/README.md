@@ -15,9 +15,11 @@ Strong `|Q_ij|` is a historical comparator, not the primary mechanism candidate.
 
 The simulator supports `uniform`, `mixer_low`, and `mixer_high`. With positive-sign XY exchange amplitudes, `mixer_high` has the Perron–Frobenius positive-amplitude interpretation for connected mixers; the low extremum is a sensitivity control. These conditions diagnose initialization sensitivity without guaranteeing an improvement or isolating a pure topology effect.
 
-**Numerical calibration is the next scientific phase.** Regression validation is not performance evidence. The project has not demonstrated quantum advantage, hardware advantage, learned architecture discovery, or improved trainability. See the [scientific scope](../docs/SCIENTIFIC_SCOPE.md), [mechanism hypothesis](../docs/MECHANISM_HYPOTHESIS.md), and [research protocol](../paper/research_protocol.md) for the current claim boundary and plans.
+**The later P33 development calibration FAILED** (2 failed and 19 unresolved references of 192); Stage 7N's high-RMS exploratory comparison is nonconfirmatory and not independently reproducible from this GitHub checkout. The fixed-C6 32-QUBO high-versus-low assignment experiment is **implemented but NOT EXECUTED**. Regression validation is not performance evidence. See the [development-evidence audit](../docs/DEVELOPMENT_EVIDENCE_AUDIT.md), [frozen C6 design](../paper/controlled_mixer_alignment_v1.md), and [scientific scope](../docs/SCIENTIFIC_SCOPE.md). There is no demonstrated quantum or hardware advantage, learned architecture discovery, or improved trainability.
 
 ## Metric provenance and preservation
+
+**Historical DKS CSV erratum:** In the preserved `independent_dks_benchmark_v1_instances.csv`, the three columns called `structure_minus_*` contain **baseline minus structure**, contrary to their names. Read the [schema/sign erratum](independent_dks_schema_erratum.md) before analyzing those columns. The generator now uses correctly named `*_minus_structure` headers for *new* output only; the archived CSV is not changed.
 
 All previously stored reports, CSV/JSON records, and the PNG figure are left unchanged. In particular, this semantics repair does not regenerate the pilot or independent DKS results, rewrite their statistics, or change their experimental conclusions.
 
